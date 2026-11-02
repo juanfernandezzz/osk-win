@@ -19,6 +19,5 @@ cpal = { workspace = true, optional = true }
 whisper-rs = { workspace = true, optional = true }
 
 [features]
-default = ["neural", "dictation"]
-neural = ["oskwin-core/neural"]
+default = ["dictation"]
 dictation = ["dep:cpal", "dep:whisper-rs"]

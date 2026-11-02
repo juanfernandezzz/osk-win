@@ -1,6 +1,6 @@
 [package]
 name = "oskwin-core"
-description = "Pure logic for the osk-win Windows on-screen keyboard: layouts, modifier engine, tap events, n-gram word prediction, and char-to-key mapping. No Win32, no GUI."
+description = "Pure logic for the osk-win Windows on-screen keyboard: layouts, modifier engine, tap events, and char-to-key mapping. No Win32, no GUI."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,12 +8,3 @@ authors.workspace = true
 
 [dependencies]
 parking_lot = { workspace = true }
-candle-core = { workspace = true, optional = true }
-candle-transformers = { workspace = true, optional = true }
-tokenizers = { workspace = true, optional = true }
-rayon = { workspace = true, optional = true }
-ahash = { workspace = true, optional = true }
-
-[features]
-default = ["neural"]
-neural = ["dep:candle-core", "dep:candle-transformers", "dep:tokenizers", "dep:rayon", "dep:ahash"]

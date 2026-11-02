@@ -22,7 +22,6 @@ macro_rules! warn {
 
 mod backend;
 mod cairo;
-mod history;
 mod render;
 mod ui;
 mod vk;
@@ -55,10 +54,6 @@ struct Args {
     /// Keyboard layout for --render (e.g. "65%", "65%+Num").
     #[arg(long)]
     layout: Option<String>,
-
-    /// Text typed into the predictor before --render draws.
-    #[arg(long)]
-    typed: Option<String>,
 
     /// Label of the key --render draws hovered, or "handle" (the
     /// resize corner) or "none" (inside, over nothing).
@@ -107,22 +102,6 @@ struct Args {
     /// Color theme (e.g. "default", "tokyo", "dracula", "abyss").
     #[arg(long)]
     theme: Option<String>,
-
-    /// List learned words, most frequent first, and exit.
-    #[arg(long)]
-    list_words: bool,
-
-    /// Forget a learned word (and its bigrams) and exit.
-    #[arg(long)]
-    forget_word: Option<String>,
-
-    /// Teach a word to the predictor and exit.
-    #[arg(long)]
-    learn_word: Option<String>,
-
-    /// Remove all learned words and exit.
-    #[arg(long)]
-    clear_words: bool,
 
     /// Record the microphone for N seconds, transcribe offline, print
     /// the text, and exit.
@@ -186,47 +165,8 @@ fn main() {
         }
     }
 
-    if args.list_words
-        || args.forget_word.is_some()
-        || args.learn_word.is_some()
-        || args.clear_words
-    {
-        let mut p = osk_core::predict::Predictor::new();
-        history::load_history(&mut p);
-        if let Some(w) = &args.forget_word {
-            if p.forget_word(w) {
-                println!("forgot '{w}'");
-            } else {
-                eprintln!("osk: word '{w}' is not in learned history");
-                std::process::exit(1);
-            }
-        }
-        if let Some(w) = &args.learn_word {
-            if p.learn_word(w, 1) {
-                println!("learned '{w}'");
-            } else {
-                eprintln!("osk: invalid word '{w}'");
-                std::process::exit(1);
-            }
-        }
-        if args.clear_words {
-            let count = p.learned_words().len();
-            p.clear_learned();
-            println!("cleared {count} learned words");
-        }
-        if args.list_words {
-            for w in p.learned_words() {
-                println!("{:>5}  {}", w.count, w.word);
-            }
-        }
-        if let Err(e) = history::save_history_if_dirty(&mut p) {
-            eprintln!("osk: saving learned history failed: {e}");
-        }
-        std::process::exit(0);
-    }
-
-    // Headless render: no window, no injection backend and no neural
-    // engine, so a shot is offline and deterministic.
+    // Headless render: no window and no injection backend, so a shot
+    // is offline and deterministic.
     if let Some(out) = &args.render {
         let size = match &args.size {
             Some(s) => match parse_size(s) {
@@ -253,7 +193,6 @@ fn main() {
             size,
             layout: args.layout.clone(),
             theme: args.theme.clone(),
-            typed: args.typed.clone(),
             hover: args.hover.clone(),
             anim,
             clamp: args.clamp,
@@ -305,14 +244,10 @@ fn main() {
         backend.destroy();
         rc
     } else {
-        #[cfg(feature = "neural")]
-        let neural = osk_core::neural::NeuralEngine::new();
-        #[cfg(not(feature = "neural"))]
-        let neural = None;
         #[cfg(feature = "dictation")]
         dictate::preload();
         // ui::run takes ownership and destroys the backend on exit.
-        ui::run(backend, neural)
+        ui::run(backend)
     };
     std::process::exit(rc);
 }

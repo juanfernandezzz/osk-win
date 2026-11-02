@@ -1,5 +1,5 @@
 //! Headless self-test for key mapping, event ordering, layout
-//! invariants, prediction, and the modifier engine.
+//! invariants, and the modifier engine.
 //!
 //! Ported from `legacy/src/selftest.c`. Cases that exercised C
 //! artifacts (NULL pointers, the dead sticky-slot API superseded by
@@ -7,7 +7,7 @@
 //! every live behavior case is present.
 
 use crate::events::{
-    complete_word, sticky_presses, tap_events, OskEvent, StickyMods, TapError, TAP_MAX_EVENTS,
+    sticky_presses, tap_events, OskEvent, StickyMods, TapError, TAP_MAX_EVENTS,
 };
 use crate::key::{key, Click, Key, KeyKind, nz};
 use crate::layout::LAYOUT;
@@ -15,7 +15,6 @@ use crate::mods::{
     mod_index, next_state, Casing, ModKeyState, ModifierEngine, MOD_ALT, MOD_CTRL, MOD_META,
     MOD_SHIFT,
 };
-use crate::predict::{Predictor, MAX_SUGG};
 use crate::typekey::{type_string, CharMap, KeySink};
 
 /// Result of one self-test run.
@@ -78,7 +77,6 @@ pub fn run() -> Report {
     seq_cases(&mut t);
     input_cases(&mut t);
     layout_cases(&mut t);
-    predict_cases(&mut t);
     mod_cases(&mut t);
     Report {
         passed: t.passed,
@@ -115,6 +113,7 @@ const K_A: Key = Key {
     width: 10,
     repeat: true,
     shift_label: None,
+    altgr_label: None,
 };
 const K_C: Key = Key {
     label: Some("C"),
@@ -126,6 +125,7 @@ const K_C: Key = Key {
     width: 10,
     repeat: true,
     shift_label: None,
+    altgr_label: None,
 };
 const K_1: Key = Key {
     label: Some("1"),
@@ -137,6 +137,7 @@ const K_1: Key = Key {
     width: 10,
     repeat: true,
     shift_label: Some("!"),
+    altgr_label: None,
 };
 const K_LCTRL: Key = Key {
     label: Some("Ctrl"),
@@ -148,6 +149,7 @@ const K_LCTRL: Key = Key {
     width: 15,
     repeat: false,
     shift_label: None,
+    altgr_label: None,
 };
 const K_RCTRL: Key = Key {
     label: Some("Ctrl"),
@@ -159,6 +161,7 @@ const K_RCTRL: Key = Key {
     width: 15,
     repeat: false,
     shift_label: None,
+    altgr_label: None,
 };
 const K_CAPS: Key = Key {
     label: Some("Caps"),
@@ -170,6 +173,7 @@ const K_CAPS: Key = Key {
     width: 17,
     repeat: false,
     shift_label: None,
+    altgr_label: None,
 };
 const K_LSHIFT: Key = Key {
     label: Some("Shift"),
@@ -181,6 +185,7 @@ const K_LSHIFT: Key = Key {
     width: 27,
     repeat: false,
     shift_label: None,
+    altgr_label: None,
 };
 const K_RSHIFT: Key = Key {
     label: Some("Shift"),
@@ -192,6 +197,7 @@ const K_RSHIFT: Key = Key {
     width: 27,
     repeat: false,
     shift_label: None,
+    altgr_label: None,
 };
 
 /// (char, expected KEY_*, expected shift) rows.
@@ -353,43 +359,6 @@ fn seq_cases(t: &mut T) {
 // Linear case tables: one row per behavior, no branches to extract.
 #[allow(clippy::too_many_lines)]
 fn input_cases(t: &mut T) {
-    // complete_word: cased remainder + trailing space
-    let mut buf = [0 as char; 8];
-    t.check(
-        "cw and/a",
-        complete_word("and", "a", PLAIN, &mut buf) == Some(3)
-            && buf[0..3] == ['n', 'd', ' '],
-    );
-    t.check(
-        "cw and/a shift",
-        complete_word("and", "a", SHIFT, &mut buf) == Some(3) && buf[0..3] == ['N', 'd', ' '],
-    );
-    t.check(
-        "cw and/a caps",
-        complete_word("and", "a", CAPS, &mut buf) == Some(3) && buf[0..3] == ['N', 'D', ' '],
-    );
-    t.check(
-        "cw and/a shift+caps",
-        complete_word("and", "a", SHIFT_CAPS, &mut buf) == Some(3) && buf[0..3] == ['n', 'D', ' '],
-    );
-    t.check(
-        "cw the/the",
-        complete_word("the", "the", PLAIN, &mut buf) == Some(1) && buf[0] == ' ',
-    );
-    t.check(
-        "cw no prefix",
-        complete_word("and", "b", PLAIN, &mut buf).is_none(),
-    );
-    t.check(
-        "cw small buffer",
-        complete_word("and", "a", PLAIN, &mut [0 as char; 2]).is_none(),
-    );
-    let mut exact = [0 as char; 3];
-    t.check(
-        "cw exact buffer",
-        complete_word("and", "a", PLAIN, &mut exact) == Some(3) && exact == ['n', 'd', ' '],
-    );
-
     // tap_events: press/release order, shift wrap, caps rule at the boundary
     let mut ev = [OskEvent {
         code: 0,
@@ -630,7 +599,7 @@ fn input_cases(t: &mut T) {
         tap_events(K_A.tap().unwrap(), SHIFT, &all, &mut ev[..9]) == Err(TapError::TooSmall),
     );
 
-    // sticky_presses: the suggestion-click modifier path
+    // sticky_presses: the sticky modifier codes in slot order
     t.check(
         "sticky empty",
         empty.is_empty() && sticky_presses(&empty) == [0, 0, 0],
@@ -754,207 +723,6 @@ fn layout_cases(t: &mut T) {
         }
     }
     t.check("l65 arrows unique", ok);
-}
-
-#[allow(clippy::too_many_lines)] // linear case tables, one row per behavior
-fn predict_cases(t: &mut T) {
-    fn no_dups(row: &[&str]) -> bool {
-        (0..row.len()).all(|i| (0..i).all(|j| row[i] != row[j]))
-    }
-
-    let mut p = Predictor::ephemeral();
-    p.reset();
-    let start = p.suggestions(&[]);
-    t.check(
-        "p1 start",
-        !start.is_empty()
-            && start.len() <= MAX_SUGG
-            && no_dups(&start)
-            && p.partial().is_empty(),
-    );
-
-    p.reset();
-    p.char('t');
-    let s = p.suggestions(&[]);
-    t.check(
-        "p2 t prefix",
-        !s.is_empty() && s.iter().all(|w| w.starts_with('t')) && no_dups(&s),
-    );
-
-    p.reset();
-    for c in "the".chars() {
-        p.char(c);
-    }
-    p.space();
-    let s = p.suggestions(&[]);
-    t.check(
-        "p3 the context",
-        p.partial().is_empty() && !s.is_empty() && s.len() <= MAX_SUGG && no_dups(&s),
-    );
-
-    p.reset();
-    for c in "the".chars() {
-        p.char(c);
-    }
-    p.space();
-    p.char('f');
-    let s = p.suggestions(&[]);
-    t.check(
-        "p4 the f",
-        !s.is_empty()
-            && s.len() <= MAX_SUGG
-            && s.iter().all(|w| w.starts_with('f'))
-            && no_dups(&s),
-    );
-
-    p.commit("You!");
-    t.check("p5 you context", !p.suggestions(&[]).is_empty());
-
-    p.commit("you");
-    p.char('a');
-    let s = p.suggestions(&[]);
-    t.check(
-        "p6 you a",
-        !s.is_empty() && s.iter().all(|w| w.starts_with('a')) && no_dups(&s),
-    );
-
-    p.commit("zygote");
-    let s = p.suggestions(&[]);
-    t.check(
-        "p7 unknown word learned",
-        s.contains(&"zygote"),
-    );
-
-    p.commit("the");
-    p.space();
-    let s = p.suggestions(&[]);
-    t.check(
-        "p8 bare space drops",
-        p.partial().is_empty()
-            && !s.is_empty()
-            && s.len() <= MAX_SUGG
-            && no_dups(&s)
-            && s.contains(&"zygote"),
-    );
-
-    p.commit("the");
-    p.char('f');
-    p.backspace();
-    let s = p.suggestions(&[]);
-    t.check(
-        "p9 backspace",
-        p.partial().is_empty() && !s.is_empty() && no_dups(&s),
-    );
-
-    p.commit("");
-    let s = p.suggestions(&[]);
-    t.check(
-        "p11 empty commit",
-        !s.is_empty() && s.len() <= MAX_SUGG && no_dups(&s) && s.contains(&"zygote"),
-    );
-
-    p.reset();
-    p.commit("the");
-    let a = p.suggestions(&[]);
-    p.reset();
-    p.commit("THE");
-    t.check("p13 case fold", p.suggestions(&[]) == a);
-
-    p.commit("the");
-    p.break_word();
-    let s = p.suggestions(&[]);
-    t.check(
-        "p14 break",
-        p.partial().is_empty() && !s.is_empty() && s.len() <= MAX_SUGG && no_dups(&s),
-    );
-
-    p.commit("the");
-    p.char(' ');
-    let s = p.suggestions(&[]);
-    t.check(
-        "p15 space char breaks",
-        p.partial().is_empty() && !s.is_empty() && s.len() <= MAX_SUGG && no_dups(&s),
-    );
-
-    // Two-word context: trigram takes priority over the bigram.
-    p.reset();
-    p.commit("i");
-    p.commit("want");
-    let s = p.suggestions(&[]);
-    t.check(
-        "p16 trigram context",
-        !s.is_empty() && s.len() <= MAX_SUGG && no_dups(&s),
-    );
-
-    // Suggestions are stable for a given state.
-    let again = p.suggestions(&[]);
-    t.check("p17 stable", s == again);
-
-    // Contractions: an apostrophe extends a letter run; a second one
-    // breaks the word. Sentence punctuation offers the starter blend.
-    p.reset();
-    for c in "don".chars() {
-        p.char(c);
-    }
-    p.char('\'');
-    t.check("p18 contraction partial", p.partial() == "don'");
-    p.char('\'');
-    t.check("p19 double apostrophe breaks", p.partial().is_empty());
-    p.char('.');
-    t.check(
-        "p20 sentence start",
-        p.partial().is_empty() && p.suggestions(&[]).contains(&"i"),
-    );
-
-    // Learned-word management: learn, list, forget, clear.
-    p.reset();
-    p.commit("zygote");
-    p.learn_word("quixotic", 4);
-    let learned = p.learned_words();
-    t.check(
-        "p21 learned words listed",
-        learned.iter().any(|l| l.word == "quixotic" && l.count == 4 && l.links == 0)
-            && learned.iter().any(|l| l.word == "zygote" && l.links >= 1),
-    );
-    t.check(
-        "p22 is_learned",
-        p.is_learned("quixotic") && !p.is_learned("quasar"),
-    );
-    t.check(
-        "p23 forget word",
-        p.forget_word("quixotic") && !p.is_learned("quixotic"),
-    );
-    t.check("p24 forget unknown", !p.forget_word("quixotic"));
-    p.clear_learned();
-    t.check("p25 clear learned", p.learned_words().is_empty());
-
-    // Enter (send) ends the sentence being typed: stale context is
-    // gone and the next word gets the sentence-start blend.
-    let mut f = Predictor::ephemeral();
-    f.commit("the");
-    f.commit("want");
-    f.end_message();
-    let s = f.suggestions(&[]);
-    t.check(
-        "p26 end message",
-        f.partial().is_empty()
-            && !s.is_empty()
-            && no_dups(&s)
-            && s.iter().all(|w| {
-                matches!(*w, "i" | "the" | "we" | "how" | "what" | "yes" | "thanks" | "want")
-            }),
-    );
-
-    let mut g = Predictor::ephemeral();
-    g.end_message();
-    let s = g.suggestions(&[]);
-    t.check(
-        "p27 fresh openers",
-        !s.is_empty()
-            && s.iter().all(|w| {
-                matches!(*w, "i" | "the" | "we" | "how" | "what" | "yes" | "thanks")
-            }),
-    );
 }
 
 #[allow(clippy::too_many_lines)] // linear case tables, one row per behavior

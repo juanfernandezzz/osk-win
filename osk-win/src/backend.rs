@@ -7,7 +7,7 @@
 use oskwin_core::typekey::KeySink;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-    KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, VIRTUAL_KEY,
+    KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, VIRTUAL_KEY,
 };
 
 use crate::vk;
@@ -23,6 +23,10 @@ fn is_extended_vk(vk: u16) -> bool {
         | 0xA5 // Right Alt
     )
 }
+
+/// `dwExtraInfo` of every event the osk injects, so its keyboard hook
+/// can tell them from a real keyboard's.
+pub const OSK_MARK: usize = 0x4F53_4B;
 
 /// Injection backend.
 pub trait Backend {
@@ -68,20 +72,24 @@ impl SendInputBackend {
         Self
     }
 
-    fn send(vk: u16, up: bool) {
+    /// One key event: by scancode when `scan` is nonzero (Windows'
+    /// active layout picks the character), else by virtual key.
+    fn send(vk: u16, scan: u16, up: bool) {
         let mut flags = if up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS(0) };
-        if is_extended_vk(vk) {
+        if scan != 0 {
+            flags |= KEYEVENTF_SCANCODE;
+        } else if is_extended_vk(vk) {
             flags |= KEYEVENTF_EXTENDEDKEY;
         }
         let mut input = INPUT {
             r#type: INPUT_KEYBOARD,
             Anonymous: INPUT_0 {
                 ki: KEYBDINPUT {
-                    wVk: VIRTUAL_KEY(vk),
-                    wScan: 0,
+                    wVk: VIRTUAL_KEY(if scan != 0 { 0 } else { vk }),
+                    wScan: scan,
                     dwFlags: flags,
                     time: 0,
-                    dwExtraInfo: 0,
+                    dwExtraInfo: OSK_MARK,
                 },
             },
         };
@@ -89,6 +97,20 @@ impl SendInputBackend {
             unsafe { SendInput(std::slice::from_mut(&mut input), std::mem::size_of::<INPUT>() as i32) };
         if sent != 1 {
             eprintln!("osk: SendInput sent {sent}/1");
+        }
+    }
+}
+
+impl SendInputBackend {
+    /// Linux codes 1..=88 equal the PC set-1 scancodes of the main
+    /// block, so those go out by position and type what the user's
+    /// Windows layout (Latin American, etc.) puts there; the rest
+    /// (extended keys: arrows, Win, right Ctrl/Alt) go by virtual key.
+    fn key(code: u16, up: bool) {
+        if (1..=88).contains(&code) {
+            Self::send(0, code, up);
+        } else if let Some(vk) = vk::vk_for(code) {
+            Self::send(vk, 0, up);
         }
     }
 }
@@ -107,14 +129,10 @@ impl Backend for SendInputBackend {
         Ok(())
     }
     fn press(&mut self, code: u16) {
-        if let Some(vk) = vk::vk_for(code) {
-            Self::send(vk, false);
-        }
+        Self::key(code, false);
     }
     fn release(&mut self, code: u16) {
-        if let Some(vk) = vk::vk_for(code) {
-            Self::send(vk, true);
-        }
+        Self::key(code, true);
     }
     fn pump(&mut self) {}
     fn destroy(&mut self) {}

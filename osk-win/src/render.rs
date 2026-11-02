@@ -10,15 +10,14 @@ use std::sync::LazyLock;
 use std::time::Instant;
 
 use crate::cairo::{self, Context, FontSlant, FontWeight, Format, ImageSurface, Operator};
-use osk_core::controller::{Controller, ControllerConfig};
+use osk_core::controller::Controller;
 use osk_core::interaction::{self, Interaction};
-use osk_core::key::{key, Click, Key, KeyKind, Layout};
+use osk_core::key::{fn_code, key, Click, Key, KeyKind, Layout};
 use osk_core::layout::ALL_LAYOUTS;
 use osk_core::metrics::{self, Metrics};
 use osk_core::mods::{
     mod_index, DOUBLE_CLICK_MS, ModKeyState, MOD_ALT, MOD_CTRL, MOD_META, MOD_SHIFT,
 };
-use osk_core::predict::Predictor;
 use osk_core::typekey::KeySink;
 
 // ---- geometry ----
@@ -60,6 +59,11 @@ pub struct Theme {
     pub key_shdw: u32,
     pub key_mod: u32,
     pub keytxt: u32,
+    /// Label on a hovered key.
+    pub hov_txt: u32,
+    /// Enter fill and label.
+    pub enter: u32,
+    pub enter_txt: u32,
     pub modtxt: u32,
     pub accent: u32,
     pub ink: u32,
@@ -80,7 +84,38 @@ pub struct Theme {
     pub opacity: f64,
 }
 
+/// Theme menu grid slots (3 x 5); every theme must fit.
+pub(crate) const MENU_SLOTS: usize = 15;
+const _: () = assert!(THEMES.len() <= MENU_SLOTS);
+
 pub static THEMES: &[Theme] = &[
+    Theme {
+        name: "Windows",
+        case: 0x1a1a1a,
+        key: 0x333333,
+        key_hov: 0xe5e5e5,
+        key_hi: 0x333333,
+        key_shdw: 0x1a1a1a,
+        key_mod: 0x333333,
+        keytxt: 0xffffff,
+        hov_txt: 0x191919,
+        enter: 0x333333,
+        enter_txt: 0xffffff,
+        modtxt: 0xffffff,
+        accent: 0xe5e5e5,
+        ink: 0x191919,
+        on_bg: 0xe5e5e5,
+        on_txt: 0x191919,
+        key_press: 0xe5e5e5,
+        key_hold: 0xe5e5e5,
+        hair: 0x333333,
+        edge: 0x333333,
+        sugtxt: 0xa4a4a4,
+        sugtxt_first: 0xffffff,
+        part: 0xffffff,
+        close: 0xffffff,
+        opacity: 1.0,
+    },
     Theme {
         name: "Default",
         case: 0x0f1420,
@@ -90,6 +125,9 @@ pub static THEMES: &[Theme] = &[
         key_shdw: 0x090d15,
         key_mod: 0x181e2e,
         keytxt: 0xd5dcec,
+        hov_txt: 0xd5dcec,
+        enter: 0x5ad6c6,
+        enter_txt: 0x04201c,
         modtxt: 0x7d88a3,
         accent: 0x5ad6c6,
         ink: 0x04201c,
@@ -114,6 +152,9 @@ pub static THEMES: &[Theme] = &[
         key_shdw: 0x13141c,
         key_mod: 0x212538,
         keytxt: 0xc0caf5,
+        hov_txt: 0xc0caf5,
+        enter: 0xbb9af7,
+        enter_txt: 0x1a1b26,
         modtxt: 0x7aa2f7,
         accent: 0xbb9af7,
         ink: 0x1a1b26,
@@ -138,6 +179,9 @@ pub static THEMES: &[Theme] = &[
         key_shdw: 0x09090d,
         key_mod: 0x1b1b2a,
         keytxt: 0xcdd6f4,
+        hov_txt: 0xcdd6f4,
+        enter: 0xcba6f7,
+        enter_txt: 0x11111b,
         modtxt: 0xa6adc8,
         accent: 0xcba6f7,
         ink: 0x11111b,
@@ -162,6 +206,9 @@ pub static THEMES: &[Theme] = &[
         key_shdw: 0x1b1f27,
         key_mod: 0x2b313d,
         keytxt: 0xeceff4,
+        hov_txt: 0xeceff4,
+        enter: 0x88c0d0,
+        enter_txt: 0x2e3440,
         modtxt: 0xd8dee9,
         accent: 0x88c0d0,
         ink: 0x2e3440,
@@ -186,6 +233,9 @@ pub static THEMES: &[Theme] = &[
         key_shdw: 0x141617,
         key_mod: 0x252525,
         keytxt: 0xebdbb2,
+        hov_txt: 0xebdbb2,
+        enter: 0xfe8019,
+        enter_txt: 0x1d2021,
         modtxt: 0xd5c4a1,
         accent: 0xfe8019,
         ink: 0x1d2021,
@@ -210,6 +260,9 @@ pub static THEMES: &[Theme] = &[
         key_shdw: 0x13111c,
         key_mod: 0x222033,
         keytxt: 0xe0def4,
+        hov_txt: 0xe0def4,
+        enter: 0xebbcba,
+        enter_txt: 0x191724,
         modtxt: 0x908caa,
         accent: 0xebbcba,
         ink: 0x191724,
@@ -234,6 +287,9 @@ pub static THEMES: &[Theme] = &[
         key_shdw: 0x191a21,
         key_mod: 0x292b3a,
         keytxt: 0xf8f8f2,
+        hov_txt: 0xf8f8f2,
+        enter: 0xbd93f9,
+        enter_txt: 0x282a36,
         modtxt: 0x6272a4,
         accent: 0xbd93f9,
         ink: 0x282a36,
@@ -258,6 +314,9 @@ pub static THEMES: &[Theme] = &[
         key_shdw: 0x1e2326,
         key_mod: 0x2a3137,
         keytxt: 0xd3c6aa,
+        hov_txt: 0xd3c6aa,
+        enter: 0xa7c080,
+        enter_txt: 0x232a2e,
         modtxt: 0x859289,
         accent: 0xa7c080,
         ink: 0x232a2e,
@@ -282,6 +341,9 @@ pub static THEMES: &[Theme] = &[
         key_shdw: 0x16161d,
         key_mod: 0x22222d,
         keytxt: 0xdcd7ba,
+        hov_txt: 0xdcd7ba,
+        enter: 0x957fb8,
+        enter_txt: 0x181820,
         modtxt: 0x727169,
         accent: 0x957fb8,
         ink: 0x181820,
@@ -306,6 +368,9 @@ pub static THEMES: &[Theme] = &[
         key_shdw: 0x001b22,
         key_mod: 0x002b36,
         keytxt: 0x93a1a1,
+        hov_txt: 0x93a1a1,
+        enter: 0x268bd2,
+        enter_txt: 0x002b36,
         modtxt: 0x657b83,
         accent: 0x268bd2,
         ink: 0x002b36,
@@ -330,6 +395,9 @@ pub static THEMES: &[Theme] = &[
         key_shdw: 0x0d091b,
         key_mod: 0x15102c,
         keytxt: 0x00ffc2,
+        hov_txt: 0x00ffc2,
+        enter: 0xff0055,
+        enter_txt: 0x120e24,
         modtxt: 0x965fd4,
         accent: 0xff0055,
         ink: 0x120e24,
@@ -355,6 +423,9 @@ pub static THEMES: &[Theme] = &[
         key_shdw: 0x061014,
         key_mod: 0x0e2026,
         keytxt: 0xd8eef0,
+        hov_txt: 0xd8eef0,
+        enter: 0xff8a80,
+        enter_txt: 0x0b1a1f,
         modtxt: 0x5f8a91,
         accent: 0xff8a80,
         ink: 0x0b1a1f,
@@ -458,7 +529,7 @@ pub(crate) struct Rect {
     pub(crate) y: f64,
     pub(crate) w: f64,
     pub(crate) h: f64,
-    /// Index into the suggestion list (0 for close/layout).
+    /// Item index (theme cards); 0 for the bar chips.
     pub(crate) idx: usize,
 }
 
@@ -471,11 +542,8 @@ impl Rect {
 /// Bar element positions measured during render.
 #[derive(Clone, Copy)]
 pub(crate) struct BarLayout {
-    pub(crate) sugg: [Rect; 5],
-    pub(crate) n_sugg: usize,
     /// The bar's free area: the strip between the left margin and one
-    /// gap before the first chip, where the suggestion pills are
-    /// centered and where the VIA status line may run. Measured once
+    /// gap before the first chip, where the VIA status line may run. Measured once
     /// here so both painters share it.
     pub(crate) text_left: f64,
     pub(crate) text_right: f64,
@@ -483,10 +551,9 @@ pub(crate) struct BarLayout {
     pub(crate) via_rect: Rect,
     pub(crate) theme_rect: Rect,
     pub(crate) close_rect: Rect,
+    pub(crate) min_rect: Rect,
     pub(crate) theme_menu_rect: Rect,
-    pub(crate) theme_item_rects: [Rect; 12],
-    pub(crate) tab_toggle_rect: Rect,
-    pub(crate) pred_toggle_rect: Rect,
+    pub(crate) theme_item_rects: [Rect; MENU_SLOTS],
     pub(crate) mic_rect: Rect,
     /// Scale the theme menu was laid out at (1.0 = natural size; less
     /// when the window is too small for it), for its text and padding.
@@ -515,13 +582,12 @@ pub(crate) enum ViaChipLook {
 #[derive(Clone)]
 pub(crate) struct ViaFrame {
     pub(crate) chip: ViaChipLook,
-    /// None = draw the suggestion pills; Some = one status line in
-    /// their place.
+    /// None = nothing in the free area; Some = one status line there.
     pub(crate) status: Option<String>,
 }
 
 impl ViaFrame {
-    /// The idle look: normal chip, suggestion pills visible.
+    /// The idle look: normal chip, no status line.
     pub(crate) fn idle() -> Self {
         ViaFrame {
             chip: ViaChipLook::Normal,
@@ -559,7 +625,11 @@ pub(crate) struct View<'a> {
     /// `--render` pins it with `--anim`.
     pub(crate) handle_anim: f64,
     pub(crate) theme_menu_open: bool,
-    /// Read access: modifiers, prediction flags, suggestions.
+    /// osk.exe's Fn is latched: the number row shows F1..F12.
+    pub(crate) fn_on: bool,
+    /// Keys a real keyboard holds down (KEY_* codes).
+    pub(crate) held: &'a [u16],
+    /// Read access: modifiers.
     pub(crate) ctl: &'a Controller,
     /// VIA chip look and status line for this frame.
     pub(crate) via: ViaFrame,
@@ -607,6 +677,10 @@ pub(crate) struct CacheKey {
     upper: bool,
     /// Symbol keys show their shifted labels.
     shift: bool,
+    /// Keys show their AltGr labels.
+    altgr: bool,
+    /// The number row shows F1..F12 (osk.exe's Fn).
+    fn_on: bool,
 }
 
 /// The case and every key at rest, drawn once into a buffer-sized
@@ -657,8 +731,6 @@ pub struct RenderOpts {
     pub layout: Option<String>,
     /// Theme name (case-insensitive); None = the default theme.
     pub theme: Option<String>,
-    /// Text typed into the predictor before drawing.
-    pub typed: Option<String>,
     /// Label of the key to draw hovered.
     pub hover: Option<String>,
     /// Handle hover-ease progress to draw (0..=1); None = 1.0 when
@@ -771,42 +843,12 @@ fn fake_wave_levels(n: usize) -> Vec<f32> {
 }
 
 /// A sink that discards every injection event: `--render` shows the
-/// predictor's state but never injects anywhere.
+/// modifier state but never injects anywhere.
 struct DiscardSink;
 
 impl KeySink for DiscardSink {
     fn press(&mut self, _code: u16) {}
     fn release(&mut self, _code: u16) {}
-}
-
-/// The layout key that types `ch`: an exact label first (digits,
-/// symbols), then a letter key case-insensitively, then the space bar.
-fn typed_key(layout: &Layout, ch: char) -> Option<Key> {
-    let s = ch.to_string();
-    for row in layout.rows {
-        for k in row.keys {
-            if !k.is_gap() && k.label == Some(s.as_str()) {
-                return Some(*k);
-            }
-        }
-    }
-    for row in layout.rows {
-        for k in row.keys {
-            if !k.is_gap() && k.letter && k.label.is_some_and(|l| l.eq_ignore_ascii_case(&s)) {
-                return Some(*k);
-            }
-        }
-    }
-    if ch == ' ' {
-        for row in layout.rows {
-            for k in row.keys {
-                if !k.is_gap() && k.code_u16() == key::KEY_SPACE {
-                    return Some(*k);
-                }
-            }
-        }
-    }
-    None
 }
 
 /// The `--anim` pin, or the natural endpoint for where `--hover`
@@ -825,34 +867,24 @@ fn anim_pin(opts: &RenderOpts) -> f64 {
 }
 
 /// Whether a `--hover` name targets a measured bar element ("via",
-/// "close", a "pillN" suggestion) instead of a key. These names are
+/// "close", ...) instead of a key. These names are
 /// resolved after measure_bar; see [`bar_hover_target`].
 fn is_bar_hover_name(name: &str) -> bool {
-    matches!(name, "layout" | "via" | "theme" | "close")
-        || name == "mic"
-        || name.starts_with("pill")
+    matches!(name, "layout" | "via" | "theme" | "close" | "min" | "mic")
 }
 
 /// The rect a `--hover` bar name points at: the element's drawn rect
-/// from the measurement pass. A "pillN" name indexes the drawn
-/// suggestions ("pill" = 0, the primary).
+/// from the measurement pass.
 fn bar_hover_target(bar: &BarLayout, name: &str) -> Option<Rect> {
     match name {
         "layout" => Some(bar.layout_rect),
         "via" => Some(bar.via_rect),
         "theme" => Some(bar.theme_rect),
         "close" => Some(bar.close_rect),
+        "min" => Some(bar.min_rect),
         #[cfg(feature = "dictation")]
         "mic" => Some(bar.mic_rect),
-        _ => {
-            let rest = name.strip_prefix("pill")?;
-            let i = if rest.is_empty() {
-                0
-            } else {
-                rest.parse::<usize>().ok()?
-            };
-            (i < bar.n_sugg).then(|| bar.sugg[i])
-        }
+        _ => None,
     }
 }
 
@@ -973,27 +1005,12 @@ fn mods_click(ctl: &mut Controller, layout: &Layout, slot: usize, want: &str) ->
     Ok(())
 }
 
-/// The controller for a headless render: prediction on with an
-/// ephemeral predictor, the `--typed` characters through the real
-/// click path (the sink discards the injection events, so the
-/// suggestion pills match a live session) and the `--mods` states
-/// through the same path, so the frames show what a
+/// The controller for a headless render: the `--mods` states go
+/// through the real click path (the sink discards the injection
+/// events), so the frames show what a
 /// latched/locked/caps key really draws — nothing faked.
 fn headless_ctl(opts: &RenderOpts, layout: &'static Layout) -> Result<Controller, String> {
-    let mut ctl = Controller::with_predictor(
-        ControllerConfig {
-            prediction: true,
-            tab_accepts_prediction: false,
-        },
-        Predictor::ephemeral(),
-    );
-    if let Some(text) = &opts.typed {
-        let mut sink = DiscardSink;
-        for ch in text.chars() {
-            let k = typed_key(layout, ch).ok_or_else(|| format!("no key for '{ch}'"))?;
-            ctl.click_key(&k, now_ms(), &mut sink);
-        }
-    }
+    let mut ctl = Controller::new();
     if let Some(list) = &opts.mods {
         apply_mods(&mut ctl, layout, list)?;
     }
@@ -1050,8 +1067,7 @@ fn hold_pressed_key(view: &mut View, layout: &Layout, label: &str) -> Result<(),
 }
 
 /// The `--render` mode: draw one frame into a PNG with no Wayland
-/// connection. The controller runs over [`Predictor::ephemeral`], so
-/// nothing is read from or written to the user's history or config.
+/// connection. Nothing is read from or written to the user's config.
 #[allow(clippy::too_many_lines)]
 pub fn run(opts: RenderOpts) -> Result<(), String> {
     let layout_idx = match &opts.layout {
@@ -1106,6 +1122,8 @@ pub fn run(opts: RenderOpts) -> Result<(), String> {
         py: 0,
         inside: false,
         theme_menu_open: opts.menu,
+        fn_on: false,
+        held: &[],
         handle_anim: anim_pin(&opts),
         ctl: &ctl,
         via: match &opts.via {
@@ -1203,6 +1221,21 @@ impl View<'_> {
         layout_at(self.layout_idx)
     }
 
+    /// The modifier look of the first key with `code`, for tests.
+    #[cfg(test)]
+    pub(crate) fn key_state_vis(&self, code: u16) -> ModKeyState {
+        let k = self.layout().rows.iter().flat_map(|r| r.keys).find(|k| k.code_u16() == code).unwrap();
+        self.key_state(k, 0, 0.0, 0.0, 0.0, 0.0).vis
+    }
+
+    /// Whether cell `idx` draws pressed this frame, for tests.
+    #[cfg(test)]
+    pub(crate) fn key_drawn_down(&self, idx: usize) -> bool {
+        let (x, y, w, h) = self.key_rect(idx / 100, idx % 100);
+        let k = &self.layout().rows[idx / 100].keys[idx % 100];
+        self.key_state(k, idx, x, y, w, h).press != Press::Up
+    }
+
     /// The center of the first key labeled `label` (exact, or
     /// case-insensitively for letter keys), for `--hover`. One label
     /// search serves both `--hover` (`key_center`) and `--pressed`
@@ -1256,7 +1289,7 @@ impl View<'_> {
     /// Whether the rect reaches into one of the case's rounded corner
     /// squares, the only place the case outline clips anything.
     fn in_case_corner(&self, x: f64, y: f64, w: f64, h: f64) -> bool {
-        let r = self.metrics().case_r;
+        let r = 0.0;
         let (cw, ch) = (self.width as f64, self.height as f64);
         (x < r || x + w > cw - r) && (y < r || y + h > ch - r)
     }
@@ -1270,32 +1303,27 @@ impl View<'_> {
 
     // ---- painting ----
 
-    /// Measure the bar elements (suggestions, layout, theme icon, close)
+    /// Measure the bar elements (layout, theme icon, close)
     /// and store their rects for hit testing.
     // Every pill/menu rect measured in one pass so they stay aligned.
     #[allow(clippy::too_many_lines)]
     pub(crate) fn measure_bar(&self, cr: &Context) -> BarLayout {
         let mut bar = BarLayout {
-            sugg: [Rect::default(); 5],
-            n_sugg: 0,
             text_left: 0.0,
             text_right: 0.0,
             layout_rect: Rect::default(),
             via_rect: Rect::default(),
             theme_rect: Rect::default(),
             close_rect: Rect::default(),
+            min_rect: Rect::default(),
             theme_menu_rect: Rect::default(),
-            theme_item_rects: [Rect::default(); 12],
-            tab_toggle_rect: Rect::default(),
-            pred_toggle_rect: Rect::default(),
+            theme_item_rects: [Rect::default(); MENU_SLOTS],
             mic_rect: Rect::default(),
             menu_scale: 1.0,
         };
         let m = self.metrics();
         let bh = m.bar_h;
-        let fs = m.font_sug();
         let chip_fs = m.font_chip();
-        let side_pad = m.pill_pad();
 
         // 1. Close button on the far right
         let cw = m.close_w();
@@ -1308,12 +1336,22 @@ impl View<'_> {
             idx: 0,
         };
 
+        // 1b. Minimize, left of close.
+        let mx = cx - cw;
+        bar.min_rect = Rect {
+            x: mx,
+            y: 0.0,
+            w: cw,
+            h: bh,
+            idx: 0,
+        };
+
         let chip_pad = m.chip_pad();
         let chip_gap = m.icon;
 
         // 2. Theme icon button
         let th_w = m.icon_w();
-        let th_x = cx - th_w - chip_gap;
+        let th_x = mx - th_w - chip_gap;
         bar.theme_rect = Rect {
             x: th_x,
             y: 0.0,
@@ -1370,123 +1408,27 @@ impl View<'_> {
             idx: 0,
         };
 
-        // The bar's free area, one definition for the pill centering
-        // below and for the VIA status line in paint_bar: from the
-        // left margin to one gap before the first chip.
+        // The bar's free area, for the VIA status line in paint_bar:
+        // from the left margin to one gap before the first chip.
         let text_left = m.margin;
         let text_right = (lo_x - m.g).max(text_left);
         bar.text_left = text_left;
         bar.text_right = text_right;
 
-        // 5. Centered word prediction
-        // Surface the owned neural engine's failures (drained from the
-        // controller) here, the regularly polled point; osk-core
-        // itself never prints.
-        for e in self.ctl.take_errors() {
-            warn!("osk: neural: {e}");
-        }
-        // While dictation records the waveform replaces the pills: no
-        // pill rects are measured, so nothing invisible stays
-        // clickable. Otherwise the prediction list drives them.
-        #[cfg(feature = "dictation")]
-        let suggs: Vec<&'static str> = if self.dict_state == DictState::Recording {
-            Vec::new()
-        } else if self.ctl.prediction() {
-            self.ctl.suggestions()
-        } else {
-            Vec::new()
-        };
-        #[cfg(not(feature = "dictation"))]
-        let suggs: Vec<&'static str> = if self.ctl.prediction() {
-            self.ctl.suggestions()
-        } else {
-            Vec::new()
-        };
-        let avail_left = text_left;
-        let avail_right = text_right;
-        if !suggs.is_empty() && avail_right > avail_left + 1.3 * m.s {
-            let max_avail_w = avail_right - avail_left;
-            let pill_gap = m.pill_gap;
-            let min_pill = 1.3 * m.s;
-            let min_primary = 1.8 * m.s;
-
-            let slot_candidates: &[&[usize]] = if suggs.len() >= 5 {
-                &[&[2, 1, 0, 3, 4], &[1, 0, 2], &[0]]
-            } else if suggs.len() >= 3 {
-                &[&[1, 0, 2], &[0]]
-            } else if suggs.len() == 2 {
-                &[&[0, 1], &[0]]
-            } else {
-                &[&[0]]
-            };
-
-            for candidates in slot_candidates {
-                let mut widths = Vec::with_capacity(candidates.len());
-                let mut total_w = 0.0;
-                for &idx in *candidates {
-                    let word = suggs.get(idx).copied().unwrap_or("");
-                    let tw = self.text_w(cr, word, fs);
-                    let pw = if idx == 0 {
-                        (tw + 2.8 * side_pad).max(min_primary)
-                    } else {
-                        (tw + 1.8 * side_pad).max(min_pill)
-                    };
-                    widths.push(pw);
-                    total_w += pw;
-                }
-                total_w += (widths.len() as f64 - 1.0).max(0.0) * pill_gap;
-
-                if total_w <= max_avail_w || candidates.len() == 1 {
-                    // Centered in the free area between the margin
-                    // and the chips, not on the full width.
-                    let center_x = (text_left + text_right) / 2.0;
-                    let mut start_x = center_x - total_w / 2.0;
-                    if start_x < avail_left {
-                        start_x = avail_left;
-                    }
-                    if start_x + total_w > avail_right {
-                        start_x = (avail_right - total_w).max(avail_left);
-                    }
-
-                    bar.n_sugg = 0;
-                    for (i, &idx) in candidates.iter().enumerate() {
-                        let pw = widths[i];
-                        if bar.n_sugg < 5 {
-                            bar.sugg[bar.n_sugg] = Rect {
-                                x: start_x,
-                                y: 0.0,
-                                w: pw,
-                                h: bh,
-                                idx,
-                            };
-                            bar.n_sugg += 1;
-                        }
-                        start_x += pw + pill_gap;
-                    }
-                    break;
-                }
-            }
-        }
-
-        // 6. Theme dropdown: one row with the two toggles side by side,
-        // above a 3 x 4 grid of theme cards. The menu always fits inside
+        // 5. Theme dropdown: a 3 x 5 grid of theme cards. The menu always fits inside
         // the window below the bar: if its natural size does not, every
         // menu measure (and its text) scales down together.
         if self.theme_menu_open {
             const COLS: usize = 3;
-            const ROWS: usize = 4;
+            const ROWS: usize = MENU_SLOTS / COLS;
             let col_w0 = m.menu_col_w();
             let row_h0 = m.menu_card_h();
             let col_gap0 = m.menu_col_gap();
             let row_gap0 = m.menu_row_gap();
             let pad0 = m.menu_pad();
-            let toggle_h0 = m.menu_toggle_h();
-            let toggle_gap0 = m.menu_toggle_gap();
 
             let menu_w0 = COLS as f64 * col_w0 + (COLS - 1) as f64 * col_gap0 + 2.0 * pad0;
             let menu_h0 = pad0
-                + toggle_h0
-                + toggle_gap0
                 + ROWS as f64 * row_h0
                 + (ROWS - 1) as f64 * row_gap0
                 + pad0;
@@ -1497,7 +1439,7 @@ impl View<'_> {
             bar.menu_scale = k;
 
             let (col_w, row_h, col_gap, row_gap) = (col_w0 * k, row_h0 * k, col_gap0 * k, row_gap0 * k);
-            let (pad, toggle_h, toggle_gap) = (pad0 * k, toggle_h0 * k, toggle_gap0 * k);
+            let pad = pad0 * k;
             let menu_w = menu_w0 * k;
             let menu_h = menu_h0 * k;
 
@@ -1512,25 +1454,8 @@ impl View<'_> {
                 idx: 0,
             };
 
-            // The two toggles share the top row, one gap apart.
-            let toggle_w = (menu_w - 2.0 * pad - col_gap) / 2.0;
-            bar.pred_toggle_rect = Rect {
-                x: menu_x + pad,
-                y: menu_y + pad,
-                w: toggle_w,
-                h: toggle_h,
-                idx: 0,
-            };
-            bar.tab_toggle_rect = Rect {
-                x: menu_x + pad + toggle_w + col_gap,
-                y: menu_y + pad,
-                w: toggle_w,
-                h: toggle_h,
-                idx: 0,
-            };
-
-            let grid_y = menu_y + pad + toggle_h + toggle_gap;
-            for idx in 0..COLS * ROWS {
+            let grid_y = menu_y + pad;
+            for idx in 0..THEMES.len() {
                 let col = idx % COLS;
                 let row = idx / COLS;
                 bar.theme_item_rects[idx] = Rect {
@@ -1587,7 +1512,7 @@ impl View<'_> {
             0.5,
             self.width as f64 - 1.0,
             self.height as f64 - 1.0,
-            self.metrics().case_r.max(1.0),
+            0.0,
         );
         set_src(cr, self.theme.edge);
         cr.set_line_width(1.0);
@@ -1617,17 +1542,36 @@ impl View<'_> {
         }
     }
 
+    /// Shift as the labels show it: latched on the osk or held on a keyboard.
+    pub(crate) fn shift_shown(&self) -> bool {
+        self.ctl.mods().shift_active()
+            || self.held.iter().any(|&c| matches!(c, key::KEY_LEFTSHIFT | key::KEY_RIGHTSHIFT))
+    }
+
+    /// Whether letters show capitals: Caps Lock inverts the shown Shift.
+    fn upper_shown(&self) -> bool {
+        osk_core::mods::Casing { shift: self.shift_shown(), ..self.ctl.mods().casing() }.letter_upper()
+    }
+
+    /// AltGr as the labels show it: latched on the osk or held on a keyboard.
+    pub(crate) fn altgr_shown(&self) -> bool {
+        let mods = self.ctl.mods();
+        (mods.state(MOD_ALT).is_active() && mods.code(MOD_ALT) == key::KEY_RIGHTALT)
+            || self.held.contains(&key::KEY_RIGHTALT)
+    }
+
     /// What the at-rest keyboard depends on.
     fn cache_key(&self) -> CacheKey {
-        let mods = self.ctl.mods();
         CacheKey {
             buf: (self.buf_w, self.buf_h),
             size: (self.width, self.height),
             theme_idx: self.theme_idx,
             layout_idx: self.layout_idx,
             grid_cols: self.grid_cols,
-            upper: mods.casing().letter_upper(),
-            shift: mods.shift_active(),
+            upper: self.upper_shown(),
+            shift: self.shift_shown(),
+            altgr: self.altgr_shown(),
+            fn_on: self.fn_on,
         }
     }
 
@@ -1656,7 +1600,7 @@ impl View<'_> {
             0.0,
             self.width as f64,
             self.height as f64,
-            self.metrics().case_r,
+            0.0,
         );
         let _ = cr.fill();
     }
@@ -1667,6 +1611,20 @@ impl View<'_> {
             return;
         };
         set_src(cr, color);
+        cr.move_to(
+            cx - ext.width() / 2.0 - ext.x_bearing(),
+            cy - ext.height() / 2.0 - ext.y_bearing(),
+        );
+        let _ = cr.show_text(s);
+    }
+
+    /// A key's corner hint: `draw_centered`, dimmed.
+    fn draw_hint(&self, cr: &Context, s: &str, cx: f64, cy: f64, size: f64, color: u32) {
+        cr.set_font_size(size);
+        let Some(ext) = cr.text_extents(s).ok() else {
+            return;
+        };
+        set_src_rgba(cr, color, 0.6);
         cr.move_to(
             cx - ext.width() / 2.0 - ext.x_bearing(),
             cy - ext.height() / 2.0 - ext.y_bearing(),
@@ -1690,13 +1648,13 @@ impl View<'_> {
         cr.text_extents(s).map(|e| e.width()).unwrap_or(0.0)
     }
 
-    /// The one visual treatment shared by suggestion pills and the
+    /// The one visual treatment shared by the
     /// bar's text/icon chips: the Metrics capsule radius (`pill_r`),
     /// one fill and one 1 px edge stroke — the same fill/border pair
     /// a keycap draws. `r` spans the full bar height; the painted
     /// capsule keeps its Metrics inset and pill height. The callers'
-    /// state tables pick the colors; the primary suggestion and an
-    /// armed VIA chip stay accent-marked.
+    /// state tables pick the colors; an
+    /// armed VIA chip stays accent-marked.
     fn paint_bar_box(&self, cr: &Context, r: &Rect, bg: u32, border: Option<u32>) {
         if r.w <= 0.0 {
             return;
@@ -1725,7 +1683,7 @@ impl View<'_> {
         // One treatment: the keycap fill, a hairline edge and plain
         // text; hover matches a key's hover.
         let (bg, fg, border) = if hov {
-            (self.theme.key_hov, self.theme.keytxt, Some(self.theme.edge))
+            (self.theme.key_hov, self.theme.hov_txt, Some(self.theme.edge))
         } else {
             (self.theme.key, self.theme.keytxt, Some(self.theme.edge))
         };
@@ -1742,8 +1700,6 @@ impl View<'_> {
         let _ = cr.save();
         cr.rectangle(0.0, 0.0, self.width as f64, bh);
         cr.clip();
-        rrect(cr, 0.0, 0.0, self.width as f64, self.height as f64, m.case_r);
-        cr.clip();
         cr.set_operator(Operator::Source);
         set_src_rgba(cr, self.theme.case, self.theme.opacity);
         cr.rectangle(0.0, 0.0, self.width as f64, bh);
@@ -1756,11 +1712,9 @@ impl View<'_> {
         cr.rectangle(0.0, 0.0, self.width as f64, bh);
         cr.clip();
         cr.set_operator(Operator::Over);
-        // The bar's free area (where the pills sit): the live
-        // waveform while dictation records, the remap status line
-        // while a VIA session is up, the suggestion pills otherwise.
-        // Transcribing draws nothing extra — no pill-sized text, no
-        // status line.
+        // The bar's free area: the live waveform while dictation
+        // records, the remap status line while a VIA session is up.
+        // Transcribing draws nothing extra.
         #[cfg(feature = "dictation")]
         if self.dict_state == DictState::Recording {
             self.paint_waveform(cr, bar);
@@ -1791,7 +1745,7 @@ impl View<'_> {
                         (self.theme.key_mod, self.theme.modtxt, Some(self.theme.edge))
                     }
                     ViaChipLook::Normal if hov => {
-                        (self.theme.key_hov, self.theme.keytxt, Some(self.theme.edge))
+                        (self.theme.key_hov, self.theme.hov_txt, Some(self.theme.edge))
                     }
                     ViaChipLook::Normal => {
                         (self.theme.key, self.theme.keytxt, Some(self.theme.edge))
@@ -1815,7 +1769,7 @@ impl View<'_> {
         let (th_bg, th_fg, th_border) = if th_active {
             (self.theme.on_bg, self.theme.accent, Some(self.theme.accent))
         } else if th_hov {
-            (self.theme.key_hov, self.theme.keytxt, Some(self.theme.edge))
+            (self.theme.key_hov, self.theme.hov_txt, Some(self.theme.edge))
         } else {
             (self.theme.key, self.theme.keytxt, Some(self.theme.edge))
         };
@@ -1843,7 +1797,7 @@ impl View<'_> {
             let (mic_bg, mic_fg, mic_border) = if armed {
                 (self.theme.on_bg, self.theme.accent, Some(self.theme.accent))
             } else if mic_hov {
-                (self.theme.key_hov, self.theme.keytxt, Some(self.theme.edge))
+                (self.theme.key_hov, self.theme.hov_txt, Some(self.theme.edge))
             } else {
                 (self.theme.key, self.theme.keytxt, Some(self.theme.edge))
             };
@@ -1864,12 +1818,20 @@ impl View<'_> {
             m.font_close(),
             if close_hov { self.theme.close } else { self.theme.modtxt },
         );
+        let min_hov = self.inside && bar.min_rect.contains(self.px as f64, self.py as f64);
+        self.draw_centered(
+            cr,
+            "\u{2013}",
+            bar.min_rect.x + bar.min_rect.w / 2.0,
+            bh / 2.0,
+            m.font_close(),
+            if min_hov { self.theme.keytxt } else { self.theme.modtxt },
+        );
         let _ = cr.restore();
     }
 
     /// The bar's free area when dictation is not recording: the remap
-    /// status line while a VIA session reports, the suggestion pills
-    /// otherwise.
+    /// status line while a VIA session reports, empty otherwise.
     fn paint_free_area(&self, cr: &Context, bar: &BarLayout) {
         let m = self.metrics();
         let bh = m.bar_h;
@@ -1896,47 +1858,6 @@ impl View<'_> {
                 }
             }
             self.draw_centered(cr, &line, (x0 + x1) / 2.0, bh / 2.0, fs, self.theme.accent);
-        } else {
-            // The pills stay between the two gaps the bar budget
-            // leaves; paint_bar_box keeps the Metrics pill inset.
-            let suggs = self.ctl.suggestions();
-
-            for i in 0..bar.n_sugg {
-                let r = bar.sugg[i];
-                let hov = self.inside && r.contains(self.px as f64, self.py as f64);
-                let is_primary = r.idx == 0;
-                let word = suggs.get(r.idx).copied().unwrap_or("");
-                if word.is_empty() {
-                    continue;
-                }
-
-                let rx = r.x;
-                let rw = r.w;
-
-                // One treatment for pills and chips (paint_bar_box):
-                // keycap fill, hairline edge, capsule radius; the
-                // primary suggestion stays accent-marked, hover
-                // matches a key's hover.
-                let (bg, fg, border) = if is_primary {
-                    if hov {
-                        (self.theme.key_press, self.theme.ink, None)
-                    } else {
-                        (self.theme.on_bg, self.theme.on_txt, Some(self.theme.accent))
-                    }
-                } else if hov {
-                    (self.theme.key_hov, self.theme.keytxt, Some(self.theme.edge))
-                } else {
-                    (self.theme.key, self.theme.keytxt, Some(self.theme.edge))
-                };
-
-                // `r` is the full-bar-height rect; the helper keeps
-                // its own Metrics inset and pill height.
-                self.paint_bar_box(cr, &r, bg, border);
-
-                let weight = if is_primary { FontWeight::Bold } else { FontWeight::Normal };
-                cr.select_font_face(FONT, FontSlant::Normal, weight);
-                self.draw_centered(cr, word, rx + rw / 2.0, bh / 2.0, fs, fg);
-            }
         }
     }
 
@@ -2074,62 +1995,7 @@ impl View<'_> {
         let k = bar.menu_scale;
         let fs = m.font_menu() * k;
         let text_pad = m.menu_text_pad() * k;
-        let right_pad = m.menu_right_pad() * k;
-        // Prediction on/off toggle (top row)
-        {
-            let pr = &bar.pred_toggle_rect;
-            let pr_hov = self.inside && pr.contains(self.px as f64, self.py as f64);
-            let active = self.ctl.prediction();
-            let (bg, fg) = if active {
-                (self.theme.on_bg, self.theme.accent)
-            } else if pr_hov {
-                (self.theme.key_hov, self.theme.keytxt)
-            } else {
-                (self.theme.key_mod, self.theme.modtxt)
-            };
-            cr.new_path();
-            rrect(cr, pr.x, pr.y, pr.w, pr.h, m.menu_item_r());
-            set_src(cr, bg);
-            let _ = cr.fill();
-            if active {
-                cr.new_path();
-                rrect(cr, pr.x + 0.5, pr.y + 0.5, pr.w - 1.0, pr.h - 1.0, m.menu_item_r());
-                set_src(cr, self.theme.accent);
-                cr.set_line_width(1.0);
-                let _ = cr.stroke();
-            }
-            cr.select_font_face(FONT, FontSlant::Normal, if active { FontWeight::Bold } else { FontWeight::Normal });
-            self.draw_left(cr, "Prediction", pr.x + text_pad, pr.y + pr.h / 2.0, fs, fg);
-            self.draw_centered(cr, if active { "on" } else { "off" }, pr.x + pr.w - right_pad, pr.y + pr.h / 2.0, fs * 0.9, fg);
-        }
-        // Tab accepts-prediction toggle (second row)
-        {
-            let tr = &bar.tab_toggle_rect;
-            let tr_hov = self.inside && tr.contains(self.px as f64, self.py as f64);
-            let active = self.ctl.tab_accepts_prediction();
-            let (bg, fg) = if active {
-                (self.theme.on_bg, self.theme.accent)
-            } else if tr_hov {
-                (self.theme.key_hov, self.theme.keytxt)
-            } else {
-                (self.theme.key_mod, self.theme.modtxt)
-            };
-            cr.new_path();
-            rrect(cr, tr.x, tr.y, tr.w, tr.h, m.menu_item_r());
-            set_src(cr, bg);
-            let _ = cr.fill();
-            if active {
-                cr.new_path();
-                rrect(cr, tr.x + 0.5, tr.y + 0.5, tr.w - 1.0, tr.h - 1.0, m.menu_item_r());
-                set_src(cr, self.theme.accent);
-                cr.set_line_width(1.0);
-                let _ = cr.stroke();
-            }
-            cr.select_font_face(FONT, FontSlant::Normal, if active { FontWeight::Bold } else { FontWeight::Normal });
-            self.draw_left(cr, "Tab accepts", tr.x + text_pad, tr.y + tr.h / 2.0, fs, fg);
-            self.draw_centered(cr, if active { "on" } else { "off" }, tr.x + tr.w - right_pad, tr.y + tr.h / 2.0, fs * 0.9, fg);
-        }
-        for (i, t) in THEMES.iter().enumerate().take(12) {
+        for (i, t) in THEMES.iter().enumerate() {
             let item = &bar.theme_item_rects[i];
             let hov = self.inside && item.contains(self.px as f64, self.py as f64);
             let is_cur = i == self.theme_idx;
@@ -2240,7 +2106,7 @@ impl View<'_> {
                 press_time,
                 rep_next,
                 ..
-            } if key == idx => (true, press_time, rep_next.is_some()),
+            } if self.same_key(key, idx) => (true, press_time, rep_next.is_some()),
             Interaction::Press { .. }
             | Interaction::Idle
             | Interaction::Move { .. }
@@ -2248,20 +2114,55 @@ impl View<'_> {
         };
         let held = repeating || now_ms().saturating_sub(press_time) >= interaction::HOLD_MS;
         KeyState {
-            vis: self.ctl.mods().key_visual(key),
+            vis: if self.fn_on && key.code_u16() == key::KEY_FN {
+                ModKeyState::Latched
+            } else {
+                self.ctl.mods().key_visual(key)
+            },
             press: if pressed && held {
                 Press::Held
-            } else if pressed || self.flash_key == idx as i32 {
+            } else if pressed
+                || (self.flash_key >= 0 && self.same_key(self.flash_key as usize, idx))
+                || self.held.contains(&key.code_u16())
+            {
                 Press::Down
             } else {
                 Press::Up
             },
             hov: !key.is_gap()
                 && self.inside
-                && (self.px as f64) >= rx
-                && (self.px as f64) < rx + rw
-                && (self.py as f64) >= ry
-                && (self.py as f64) < ry + rh,
+                && (self.over(rx, ry, rw, rh)
+                    || self.enter_cells(key).any(|e| {
+                        let (x, y, w, h) = self.key_rect(e / 100, e % 100);
+                        self.over(x, y, w, h)
+                    })),
+        }
+    }
+
+    fn over(&self, x: f64, y: f64, w: f64, h: f64) -> bool {
+        let (px, py) = (self.px as f64, self.py as f64);
+        px >= x && px < x + w && py >= y && py < y + h
+    }
+
+    /// osk.exe's Enter spans two rows, two cells here: when `key` is
+    /// Enter, every Enter cell, so both light as one key.
+    fn enter_cells<'s>(&'s self, key: &Key) -> impl Iterator<Item = usize> + 's {
+        let enter = key.code_u16() == key::KEY_ENTER;
+        self.layout().rows.iter().enumerate().flat_map(move |(r, row)| {
+            row.keys
+                .iter()
+                .enumerate()
+                .filter(move |(_, k)| enter && k.code_u16() == key::KEY_ENTER)
+                .map(move |(i, _)| r * 100 + i)
+        })
+    }
+
+    /// Whether cells `a` and `b` are the same key (one cell, or both Enter).
+    pub(crate) fn same_key(&self, a: usize, b: usize) -> bool {
+        a == b || {
+            let rows = self.layout().rows;
+            let code = |i: usize| rows.get(i / 100).and_then(|r| r.keys.get(i % 100)).map(Key::code_u16);
+            code(a) == Some(key::KEY_ENTER) && code(b) == Some(key::KEY_ENTER)
         }
     }
 
@@ -2290,27 +2191,51 @@ impl View<'_> {
         } else if on {
             (self.theme.on_bg, self.theme.on_txt)
         } else if is_accent {
-            (self.theme.accent, self.theme.ink)
+            (self.theme.enter, self.theme.enter_txt)
         } else if is_char {
-            (if hov { self.theme.key_hov } else { self.theme.key }, self.theme.keytxt)
+            if hov {
+                (self.theme.key_hov, self.theme.hov_txt)
+            } else {
+                (self.theme.key, self.theme.keytxt)
+            }
+        } else if hov {
+            (self.theme.key_hov, self.theme.hov_txt)
         } else {
-            (self.theme.key_mod, if hov { self.theme.keytxt } else { self.theme.modtxt })
+            (self.theme.key_mod, self.theme.modtxt)
         };
+        // The big label is what the key types now; the corners hint the
+        // other layers, Shift top-left (as osk.exe) and AltGr top-right.
         let disp: String;
+        let altgr = self.altgr_shown();
+        let mut hint_shift = None;
+        let mut hint_altgr = key.altgr_label.filter(|_| !altgr);
         if key.letter {
             let c = key.label.and_then(|l| l.chars().next()).unwrap_or(' ');
-            let upper = self.ctl.mods().casing().letter_upper();
-            disp = if upper {
-                c.to_ascii_uppercase().to_string()
-            } else {
-                c.to_ascii_lowercase().to_string()
-            };
-        } else if let Some(l) = key.label {
-            disp = if self.ctl.mods().shift_active() {
-                key.shift_label.unwrap_or(l).to_string()
-            } else {
+            disp = if let (true, Some(l)) = (altgr, key.altgr_label) {
                 l.to_string()
+            } else if self.upper_shown() {
+                c.to_uppercase().to_string()
+            } else {
+                c.to_lowercase().to_string()
             };
+        } else if self.fn_on && fn_code(code).is_some() {
+            // The Fn keys run 1..= after 0 in order: F1..F12.
+            disp = format!("F{}", code - key::KEY_1 + 1);
+            hint_altgr = None;
+        } else if let (true, Some(l)) = (altgr, key.altgr_label) {
+            disp = l.to_string();
+            hint_shift = key.shift_label;
+        } else if let Some(l) = key.label {
+            match (self.shift_shown(), key.shift_label) {
+                (true, Some(sl)) => {
+                    disp = sl.to_string();
+                    hint_shift = Some(l);
+                }
+                (_, sl) => {
+                    disp = l.to_string();
+                    hint_shift = sl;
+                }
+            }
         } else {
             disp = String::new();
         }
@@ -2321,8 +2246,10 @@ impl View<'_> {
         let cy = ry + inset;
         let cw = rw - 2.0 * inset;
         let ch = rh - 2.0 * inset;
+        // The unlabeled Enter cell under Enter reaches up into it: one L-shaped key.
+        let tail = if code == key::KEY_ENTER && key.label == Some("") { inset + m.key_r } else { 0.0 };
         let _ = cr.save();
-        cr.rectangle(rx, ry, rw, rh);
+        cr.rectangle(rx, ry - tail, rw, rh + tail);
         cr.clip();
         if self.in_case_corner(rx, ry, rw, rh) {
             rrect(cr, 0.0, 0.0, self.width as f64, self.height as f64, m.case_r);
@@ -2334,7 +2261,7 @@ impl View<'_> {
         cr.rectangle(rx, ry, rw, rh);
         let _ = cr.fill();
         cr.set_operator(Operator::Over);
-        rrect(cr, cx, cy, cw, ch, m.key_r);
+        rrect(cr, cx, cy - 2.0 * tail, cw, ch + 2.0 * tail, m.key_r);
         let key_alpha = if self.theme.opacity < 1.0 {
             (self.theme.opacity + 0.08).min(1.0)
         } else {
@@ -2342,10 +2269,13 @@ impl View<'_> {
         };
         set_src_rgba(cr, bg, key_alpha);
         let _ = cr.fill();
-        rrect(cr, cx + 0.5, cy + 0.5, cw - 1.0, ch - 1.0, m.key_r);
-        set_src_rgba(cr, self.theme.edge, key_alpha);
-        cr.set_line_width(1.0);
-        let _ = cr.stroke();
+        // The tail's top would cross Enter; it goes unstroked.
+        if tail == 0.0 {
+            rrect(cr, cx + 0.5, cy + 0.5, cw - 1.0, ch - 1.0, m.key_r);
+            set_src_rgba(cr, self.theme.edge, key_alpha);
+            cr.set_line_width(1.0);
+            let _ = cr.stroke();
+        }
         if !disp.is_empty() {
             // Character keys carry a glyph, modifier keys a word.
             let base_fs = if disp.chars().count() <= 1 {
@@ -2360,7 +2290,9 @@ impl View<'_> {
             }
             let lines: Vec<&str> = disp.lines().collect();
             if lines.len() == 1 {
-                self.draw_centered(cr, lines[0], rx + rw / 2.0, ry + rh / 2.0, fs, label);
+                // Room for the corner hints: the big label sits a little low.
+                let dy = if hint_shift.or(hint_altgr).is_some() { 0.2 * fs } else { 0.0 };
+                self.draw_centered(cr, lines[0], rx + rw / 2.0, ry + rh / 2.0 + dy, fs, label);
             } else {
                 let lh = 1.3 * fs;
                 let top = ry + rh / 2.0 - (lines.len() as f64 - 1.0) * lh / 2.0;
@@ -2368,6 +2300,13 @@ impl View<'_> {
                     self.draw_centered(cr, line, rx + rw / 2.0, top + i as f64 * lh, fs, label);
                 }
             }
+        }
+        let hs = 0.7 * m.font_char;
+        if let Some(h) = hint_shift {
+            self.draw_hint(cr, h, cx + 0.8 * hs, cy + 0.8 * hs, hs, label);
+        }
+        if let Some(h) = hint_altgr {
+            self.draw_hint(cr, h, cx + cw - 0.8 * hs, cy + 0.8 * hs, hs, label);
         }
         // Caps-lock dot in the key's top-right corner, in the key's
         // own text color (a fixed white is unreadable on Light's pale

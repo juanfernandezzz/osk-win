@@ -58,6 +58,8 @@ pub mod key {
     pub const KEY_LEFTSHIFT: u16 = 42;
     pub const KEY_BACKSLASH: u16 = 43;
     pub const KEY_Z: u16 = 44;
+    /// The ISO key left of Z (`<` `>` on Latin American).
+    pub const KEY_102ND: u16 = 86;
     pub const KEY_X: u16 = 45;
     pub const KEY_C: u16 = 46;
     pub const KEY_V: u16 = 47;
@@ -98,6 +100,9 @@ pub mod key {
     pub const KEY_INSERT: u16 = 110;
     pub const KEY_DELETE: u16 = 111;
     pub const KEY_PAUSE: u16 = 119;
+    pub const KEY_COMPOSE: u16 = 127;
+    /// osk.exe's Fn: never injected, the UI swaps the number row to F1..F12.
+    pub const KEY_FN: u16 = 0x1d0;
     pub const KEY_LEFTMETA: u16 = 125;
     pub const KEY_RIGHTMETA: u16 = 126;
     pub const KEY_KPASTERISK: u16 = 55;
@@ -114,6 +119,33 @@ pub const fn nz(code: u16) -> NonZeroU16 {
     match NonZeroU16::new(code) {
         Some(v) => v,
         None => panic!("key code 0 is a Gap, use Key::inert"),
+    }
+}
+
+/// The F-key osk.exe's Fn puts on a number-row key: 1..0 -> F1..F10,
+/// then the two keys after 0 -> F11, F12.
+pub const fn fn_code(code: u16) -> Option<u16> {
+    match code {
+        key::KEY_1..=key::KEY_0 => Some(code - key::KEY_1 + key::KEY_F1),
+        key::KEY_MINUS => Some(key::KEY_F11),
+        key::KEY_EQUAL => Some(key::KEY_F12),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod fn_tests {
+    use super::{fn_code, key};
+
+    #[test]
+    fn fn_maps_the_number_row_to_f1_f12() {
+        assert_eq!(fn_code(key::KEY_1), Some(key::KEY_F1));
+        assert_eq!(fn_code(key::KEY_9), Some(key::KEY_F9));
+        assert_eq!(fn_code(key::KEY_0), Some(key::KEY_F10));
+        assert_eq!(fn_code(key::KEY_MINUS), Some(key::KEY_F11));
+        assert_eq!(fn_code(key::KEY_EQUAL), Some(key::KEY_F12));
+        assert_eq!(fn_code(key::KEY_GRAVE), None);
+        assert_eq!(fn_code(key::KEY_Q), None);
     }
 }
 
@@ -190,6 +222,8 @@ pub struct Key {
     pub repeat: bool,
     /// Shifted display text (numbers/symbols); `None` = none.
     pub shift_label: Option<&'static str>,
+    /// Text shown while AltGr is latched; `None` = none.
+    pub altgr_label: Option<&'static str>,
 }
 
 impl Key {
@@ -241,6 +275,12 @@ impl Key {
             _ => None,
         }
     }
+    /// The same key with `label` shown while AltGr is latched.
+    pub const fn altgr(mut self, label: &'static str) -> Self {
+        self.altgr_label = Some(label);
+        self
+    }
+
     /// A key with no shifted label and no special flags.
     pub const fn plain(label: &'static str, code: u16, width: u16) -> Self {
         Key {
@@ -253,6 +293,7 @@ impl Key {
             width,
             repeat: false,
             shift_label: None,
+            altgr_label: None,
         }
     }
 
@@ -268,6 +309,7 @@ impl Key {
             width: 20,
             repeat: true,
             shift_label: None,
+            altgr_label: None,
         }
     }
 
@@ -283,6 +325,7 @@ impl Key {
             width: 20,
             repeat: true,
             shift_label: Some(shift_label),
+            altgr_label: None,
         }
     }
 
@@ -303,6 +346,7 @@ impl Key {
             width,
             repeat: true,
             shift_label: Some(shift_label),
+            altgr_label: None,
         }
     }
     /// A wide special key (Tab, Enter, Backspace, arrows, ...).
@@ -317,6 +361,7 @@ impl Key {
             width,
             repeat: false,
             shift_label: None,
+            altgr_label: None,
         }
     }
 
@@ -333,6 +378,7 @@ impl Key {
             width,
             repeat: false,
             shift_label: None,
+            altgr_label: None,
         }
     }
 
@@ -348,6 +394,7 @@ impl Key {
             width,
             repeat: false,
             shift_label: None,
+            altgr_label: None,
         }
     }
 
@@ -364,6 +411,7 @@ impl Key {
             width,
             repeat: false,
             shift_label: None,
+            altgr_label: None,
         }
     }
 
@@ -379,6 +427,7 @@ impl Key {
             width,
             repeat: true,
             shift_label: None,
+            altgr_label: None,
         }
     }
 
@@ -394,6 +443,7 @@ impl Key {
             width,
             repeat: true,
             shift_label: None,
+            altgr_label: None,
         }
     }
 
@@ -407,6 +457,7 @@ impl Key {
             width,
             repeat: false,
             shift_label: None,
+            altgr_label: None,
         }
     }
 }

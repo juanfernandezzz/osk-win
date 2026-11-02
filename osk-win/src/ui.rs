@@ -1,4 +1,4 @@
-//! The Win32 host: a topmost, non-activating popup window running the
+//! The Win32 host: a topmost, non-activating app window running the
 //! Linux osk's UI.
 //!
 //! Everything a click does is the shared [`Controller`]; the pointer
@@ -15,7 +15,11 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicIsize, Ordering};
 
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
+use windows::Win32::Foundation::{
+    GetLastError, ERROR_ALREADY_EXISTS, HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM,
+};
+use windows::Win32::System::Threading::CreateMutexW;
+use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
 use windows::Win32::Graphics::Gdi::{
     BeginPaint, EndPaint, InvalidateRect, UpdateWindow, PAINTSTRUCT,
 };
@@ -29,25 +33,25 @@ use windows::Win32::UI::WindowsAndMessaging::{
     HHOOK, MSLLHOOKSTRUCT, WH_MOUSE_LL, WM_APP, WM_MBUTTONUP, WM_RBUTTONUP, LoadCursorW, PostQuitMessage, RegisterClassExW, SetCursor, SetTimer, SetWindowPos,
     ShowWindow, TranslateMessage, CS_HREDRAW, CS_VREDRAW, IDC_ARROW, IDC_SIZENWSE, MSG,
     SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER, SW_SHOWNOACTIVATE, WM_DESTROY, WM_ERASEBKGND,
-    WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_PAINT, WM_RBUTTONDOWN,
-    WM_SETCURSOR, WM_SIZE, WM_TIMER, WNDCLASSEXW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
-    WS_EX_TOPMOST, WS_POPUP,
+    WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_PAINT,
+    WM_SETCURSOR, WM_SIZE, WM_TIMER, WNDCLASSEXW, WS_EX_APPWINDOW, WS_EX_NOACTIVATE,
+    WS_EX_TOPMOST, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, FindWindowW, SW_SHOWMINNOACTIVE, SetForegroundWindow, GetForegroundWindow, WA_INACTIVE, WM_ACTIVATE,
+    GetWindow, GW_HWNDPREV, HWND_TOPMOST, SWP_NOMOVE, KBDLLHOOKSTRUCT, WH_KEYBOARD_LL, WM_KEYDOWN,
+    WM_SYSKEYDOWN, LLKHF_EXTENDED, EVENT_SYSTEM_FOREGROUND, WINEVENT_OUTOFCONTEXT,
 };
 
-use osk_core::controller::{Clicked, Controller, ControllerConfig};
+use osk_core::controller::{Clicked, Controller};
 use osk_core::interaction::{self, Event as IEvent, Interaction};
-use osk_core::key::{key, Click, Key, KeyKind, Layout};
+use osk_core::key::{fn_code, key, Click, Key, KeyKind, Layout};
 use osk_core::mods::{ModKeyState, DOUBLE_CLICK_MS, MOD_ALT};
 use osk_core::layout::ALL_LAYOUTS;
 use osk_core::metrics::Metrics;
-use osk_core::neural::NeuralEngine;
-use osk_core::predict::Predictor;
 #[cfg(feature = "dictation")]
-use osk_core::typekey::{type_text, KeySink};
+use osk_core::typekey::type_text;
+use osk_core::typekey::KeySink;
 
-use crate::backend::Backend;
+use crate::backend::{Backend, OSK_MARK};
 use crate::cairo::{Context, FontSlant, FontWeight, Format, ImageSurface};
-use crate::history::{load_history, save_history_if_dirty};
 #[cfg(feature = "dictation")]
 use crate::render::DictState;
 use crate::render::{
@@ -66,6 +70,7 @@ const DICT_FRAME_MS: u64 = 33;
 const WM_MOUSELEAVE: u32 = 0x02A3;
 const MA_NOACTIVATE: isize = 3;
 const TIMER_ID: usize = 1;
+const RAISE_TIMER_ID: usize = 2;
 
 /// Saved preferences and window geometry persisted between runs.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -82,10 +87,6 @@ pub struct PersistentConfig {
     pub width: i32,
     #[serde(default)]
     pub height: i32,
-    #[serde(default)]
-    pub tab_accepts_prediction: bool,
-    #[serde(default = "default_prediction")]
-    pub prediction: bool,
 }
 
 fn default_pos_x() -> i32 {
@@ -96,21 +97,15 @@ fn default_pos_y() -> i32 {
     450
 }
 
-fn default_prediction() -> bool {
-    true
-}
-
 impl Default for PersistentConfig {
     fn default() -> Self {
         Self {
-            theme: "Default".to_string(),
-            layout: "65%".to_string(),
+            theme: "Windows".to_string(),
+            layout: "Latino".to_string(),
             pos_x: default_pos_x(),
             pos_y: default_pos_y(),
             width: 0,
             height: 0,
-            tab_accepts_prediction: false,
-            prediction: true,
         }
     }
 }
@@ -213,19 +208,22 @@ pub struct State {
     last_hot: u32,
     last_geom: (i32, i32, i32, i32),
     // measured bar layout, filled during render
-    sugg: [Rect; 5],
-    n_sugg: usize,
     layout_rect: Rect,
     theme_rect: Rect,
     close_rect: Rect,
+    min_rect: Rect,
+    /// osk.exe's Fn: the next number-row key sends F1..F12.
+    fn_on: bool,
+    /// The foreground window at the last click on the keyboard.
+    typing_in: isize,
+    /// Keys a real keyboard holds down (KEY_* codes), lit on the osk.
+    held: Vec<u16>,
     layout_idx: usize,
     theme_idx: usize,
     theme: Theme,
     theme_menu_open: bool,
     theme_menu_rect: Rect,
-    theme_item_rects: [Rect; 12],
-    tab_toggle_rect: Rect,
-    pred_toggle_rect: Rect,
+    theme_item_rects: [Rect; render::MENU_SLOTS],
     mic_rect: Rect,
     #[cfg(feature = "dictation")]
     dict_state: DictState,
@@ -244,7 +242,11 @@ pub struct State {
 /// app's menu bar (KeyTips, accelerator underlines) and leaves it showing.
 fn windows_click(mut k: Key) -> Key {
     if let KeyKind::Inject { code, click } = &mut k.kind {
-        if *click == Click::Momentary && is_alt(code.get()) {
+        // As in the Windows osk, Win and Alt latch for the next key
+        // (Win+Shift+S) instead of tapping on their own.
+        if *click == Click::Momentary
+            && (is_alt(code.get()) || matches!(code.get(), key::KEY_LEFTMETA | key::KEY_RIGHTMETA))
+        {
             *click = Click::Latch;
         }
     }
@@ -282,6 +284,79 @@ const WM_CLICK_ELSEWHERE: u32 = WM_APP + 1;
 const HC_ACTION: i32 = 0;
 static OSK_HWND: AtomicIsize = AtomicIsize::new(0);
 
+/// Posted by [`key_hook`] for a key a keyboard (not the osk) moves:
+/// wparam = KEY_* code, lparam = 1 down / 0 up.
+const WM_PHYS_KEY: u32 = WM_APP + 2;
+/// Posted by [`foreground_changed`]: take back the place above the taskbar.
+const WM_RAISE: u32 = WM_APP + 3;
+
+unsafe extern "system" fn key_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    if code == HC_ACTION {
+        let k = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
+        // Scancode 0x21D is the left Ctrl Windows fakes under AltGr.
+        if k.dwExtraInfo != OSK_MARK && k.scanCode & 0x200 == 0 {
+            let ext = k.flags.0 & LLKHF_EXTENDED.0 != 0;
+            if let Some(c) = phys_code(k.vkCode, k.scanCode, ext) {
+                let down = matches!(wparam.0 as u32, WM_KEYDOWN | WM_SYSKEYDOWN);
+                let hwnd = HWND(OSK_HWND.load(Ordering::Relaxed) as *mut _);
+                let _ = unsafe { PostMessageW(Some(hwnd), WM_PHYS_KEY, WPARAM(c as usize), LPARAM(down as isize)) };
+            }
+        }
+    }
+    unsafe { CallNextHookEx(None, code, wparam, lparam) }
+}
+
+/// The KEY_* code of a keyboard event: the main block by scancode, as
+/// the osk injects it; extended keys by virtual key.
+fn phys_code(vk: u32, scan: u32, extended: bool) -> Option<u16> {
+    if !extended && (1..=88).contains(&scan) {
+        return u16::try_from(scan).ok();
+    }
+    let vk = u16::try_from(vk).ok()?;
+    (89..=key::KEY_FN).find(|&c| crate::vk::vk_for(c) == Some(vk))
+}
+
+unsafe extern "system" fn foreground_changed(
+    _: HWINEVENTHOOK,
+    _: u32,
+    _: HWND,
+    _: i32,
+    _: i32,
+    _: u32,
+    _: u32,
+) {
+    let hwnd = HWND(OSK_HWND.load(Ordering::Relaxed) as *mut _);
+    let _ = unsafe { PostMessageW(Some(hwnd), WM_RAISE, WPARAM(0), LPARAM(0)) };
+}
+
+/// Both the osk and the taskbar are topmost, and the taskbar raises
+/// itself when used. Go just above it, not to the very top, so a menu
+/// or Start opened over the taskbar stays over the osk.
+fn stay_above_taskbar(hwnd: HWND) {
+    let Ok(tray) = (unsafe { FindWindowW(windows::core::w!("Shell_TrayWnd"), PCWSTR::null()) }) else {
+        return;
+    };
+    let above = |w: HWND| unsafe { GetWindow(w, GW_HWNDPREV) }.ok().filter(|p| !p.is_invalid());
+    let mut w = tray;
+    while let Some(p) = above(w) {
+        if p == hwnd {
+            return;
+        }
+        w = p;
+    }
+    let _ = unsafe {
+        SetWindowPos(
+            hwnd,
+            Some(above(tray).unwrap_or(HWND_TOPMOST)),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        )
+    };
+}
+
 unsafe extern "system" fn mouse_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code == HC_ACTION && matches!(wparam.0 as u32, WM_LBUTTONUP | WM_RBUTTONUP | WM_MBUTTONUP) {
         let pt = unsafe { (*(lparam.0 as *const MSLLHOOKSTRUCT)).pt };
@@ -298,7 +373,7 @@ unsafe extern "system" fn mouse_hook(code: i32, wparam: WPARAM, lparam: LPARAM) 
 }
 
 impl State {
-    pub fn new(backend: Box<dyn Backend>, neural: Option<NeuralEngine>) -> Self {
+    pub fn new(backend: Box<dyn Backend>) -> Self {
         let config = PersistentConfig::load();
         let theme_idx = std::env::var("OSK_THEME")
             .ok()
@@ -312,17 +387,7 @@ impl State {
         let layout = render::layout_at(layout_idx);
         let grid_cols = render::grid_cols(layout);
         let (default_w, default_h) = render::default_size(layout, grid_cols);
-        let mut ctl = Controller::with_neural(
-            ControllerConfig {
-                prediction: config.prediction,
-                tab_accepts_prediction: config.tab_accepts_prediction,
-            },
-            Predictor::new(),
-            neural,
-        );
-        // The predictor starts empty; the host loads the learned history
-        // once and saves it whenever a commit flags it dirty.
-        load_history(ctl.predictor_mut());
+        let ctl = Controller::new();
         State {
             backend,
             hwnd: 0,
@@ -347,19 +412,19 @@ impl State {
             ctl,
             last_hot: 0,
             last_geom: (-1, -1, -1, -1),
-            sugg: [Rect::default(); 5],
-            n_sugg: 0,
             layout_rect: Rect::default(),
             theme_rect: Rect::default(),
             close_rect: Rect::default(),
+            min_rect: Rect::default(),
+            fn_on: false,
+            typing_in: 0,
+            held: Vec::new(),
             layout_idx,
             theme_idx,
             theme: THEMES[theme_idx],
             theme_menu_open: false,
             theme_menu_rect: Rect::default(),
-            theme_item_rects: [Rect::default(); 12],
-            tab_toggle_rect: Rect::default(),
-            pred_toggle_rect: Rect::default(),
+            theme_item_rects: [Rect::default(); render::MENU_SLOTS],
             mic_rect: Rect::default(),
             #[cfg(feature = "dictation")]
             dict_state: DictState::Idle,
@@ -381,18 +446,8 @@ impl State {
             pos_y: self.pos_y,
             width: self.width,
             height: self.height,
-            tab_accepts_prediction: self.ctl.tab_accepts_prediction(),
-            prediction: self.ctl.prediction(),
         }
         .save();
-    }
-
-    /// Persist learned history when a commit flagged it dirty. A failed
-    /// write is user-facing and must not be silent.
-    fn save_history(&mut self) {
-        if let Err(e) = save_history_if_dirty(self.ctl.predictor_mut()) {
-            warn!("osk: saving learned history failed: {e}");
-        }
     }
 
     fn layout(&self) -> &'static Layout {
@@ -494,6 +549,7 @@ impl State {
                 flags,
             )
         };
+        stay_above_taskbar(HWND(self.hwnd as *mut _));
     }
 
     /// The drawing snapshot for this frame: exactly what the render
@@ -516,6 +572,8 @@ impl State {
             inside: self.inside,
             handle_anim: self.handle_anim(),
             theme_menu_open: self.theme_menu_open,
+            fn_on: self.fn_on,
+            held: &self.held,
             ctl: &self.ctl,
             via: ViaFrame {
                 chip: ViaChipLook::Hidden,
@@ -578,16 +636,13 @@ impl State {
         };
         surface.blit_to_hdc(hdc);
         self.surface = Some(surface);
-        self.sugg = bar.sugg;
-        self.n_sugg = bar.n_sugg;
         self.layout_rect = bar.layout_rect;
         self.theme_rect = bar.theme_rect;
         self.close_rect = bar.close_rect;
+        self.min_rect = bar.min_rect;
         self.mic_rect = bar.mic_rect;
         self.theme_menu_rect = bar.theme_menu_rect;
         self.theme_item_rects = bar.theme_item_rects;
-        self.tab_toggle_rect = bar.tab_toggle_rect;
-        self.pred_toggle_rect = bar.pred_toggle_rect;
         self.last_hot = self.hot_sig();
     }
 
@@ -634,6 +689,21 @@ impl State {
         }
     }
 
+    /// A real keyboard pressed or released `code`.
+    fn on_phys_key(&mut self, code: u16, down: bool) {
+        // shortcut: a key-up the hook misses (hook timeout, Win+L) leaves the key lit until pressed again.
+        let was = self.held.contains(&code);
+        if down == was {
+            return;
+        }
+        if down {
+            self.held.push(code);
+        } else {
+            self.held.retain(|&c| c != code);
+        }
+        self.request_redraw();
+    }
+
     /// A mouse click elsewhere finished under a latched Alt: release it.
     fn on_click_elsewhere(&mut self) {
         let mods = self.ctl.mods();
@@ -676,18 +746,6 @@ impl State {
         self.ctl.tap_key(&k, &mut sink);
         self.sync_alt();
         self.redraw_now();
-        self.save_history();
-    }
-
-    fn click_suggestion(&mut self, idx: usize) {
-        let mut sink = AltSink {
-            b: self.backend.as_mut(),
-            alt: &mut self.alt_down,
-        };
-        self.ctl.commit_suggestion(idx, &mut sink).ok();
-        self.sync_alt();
-        self.save_history();
-        self.request_redraw();
     }
 
     /// Feed one interaction event through the pure state machine and
@@ -790,21 +848,16 @@ impl State {
     fn hot_sig(&self) -> u32 {
         let at = |r: &Rect| u32::from(r.contains(self.px as f64, self.py as f64));
         let key = self.key_at(self.px, self.py).map_or(0x3ff, |k| k as u32);
-        let sugg = (0..self.n_sugg)
-            .find(|&i| self.sugg[i].contains(self.px as f64, self.py as f64))
-            .map_or(0x1f, |i| i as u32);
-        let menu_item = (0..12)
+        let menu_item = (0..THEMES.len())
             .find(|&i| self.theme_item_rects[i].contains(self.px as f64, self.py as f64))
             .map_or(0xf, |i| i as u32);
         (key << 20)
-            | (sugg << 15)
-            | (at(&self.pred_toggle_rect) << 12)
-            | (at(&self.tab_toggle_rect) << 11)
             | (at(&self.layout_rect) << 10)
             | (at(&self.theme_rect) << 9)
             | (u32::from(self.theme_menu_open) << 8)
             | (menu_item << 4)
             | (at(&self.mic_rect) << 2)
+            | (at(&self.min_rect) << 3)
             | (at(&self.close_rect) << 1)
             | u32::from(self.view().handle_hov())
     }
@@ -836,13 +889,13 @@ impl State {
             self.interact(IEvent::Release);
             return;
         }
+        let fg = unsafe { GetForegroundWindow() }.0 as isize;
+        if fg != self.hwnd {
+            self.typing_in = fg;
+        }
         let (x, y) = (self.px as f64, self.py as f64);
         if self.theme_menu_open {
-            if self.pred_toggle_rect.contains(x, y) {
-                self.ctl.set_prediction(!self.ctl.prediction());
-            } else if self.tab_toggle_rect.contains(x, y) {
-                self.ctl.set_tab_accepts_prediction(!self.ctl.tab_accepts_prediction());
-            } else if let Some(i) = (0..THEMES.len().min(12)).find(|&i| self.theme_item_rects[i].contains(x, y)) {
+            if let Some(i) = (0..THEMES.len()).find(|&i| self.theme_item_rects[i].contains(x, y)) {
                 self.theme_idx = i;
                 self.theme = THEMES[i];
                 self.theme_menu_open = false;
@@ -866,6 +919,10 @@ impl State {
             self.quit = true;
             return;
         }
+        if self.min_rect.contains(x, y) {
+            let _ = unsafe { ShowWindow(HWND(self.hwnd as *mut _), SW_SHOWMINNOACTIVE) };
+            return;
+        }
         if self.theme_rect.contains(x, y) {
             self.theme_menu_open = true;
             self.request_redraw();
@@ -873,10 +930,6 @@ impl State {
         }
         if self.layout_rect.contains(x, y) {
             self.cycle_layout();
-            return;
-        }
-        if let Some(i) = (0..self.n_sugg).find(|&i| self.sugg[i].contains(x, y)) {
-            self.click_suggestion(self.sugg[i].idx);
             return;
         }
         let (sx, sy) = Self::cursor();
@@ -906,7 +959,19 @@ impl State {
             self.on_mic();
             return;
         }
-        let key = windows_click(*self.key_of(k));
+        let mut key = windows_click(*self.key_of(k));
+        if key.code_u16() == key::KEY_FN {
+            self.fn_on = !self.fn_on;
+            self.request_redraw();
+            return;
+        }
+        // As in osk.exe, Fn lasts for one key.
+        if std::mem::take(&mut self.fn_on) {
+            if let Some(f) = fn_code(key.code_u16()) {
+                key = Key::wide("", f, key.width);
+            }
+            self.request_redraw();
+        }
         // All keyboard logic lives in the controller.
         let mut sink = AltSink {
             b: self.backend.as_mut(),
@@ -929,28 +994,14 @@ impl State {
                 self.flash_until = now_ms() + FLASH_MS;
                 self.request_redraw();
             }
-            Clicked::Tapped { .. } => {
+            Clicked::Tapped => {
                 self.interact(IEvent::Press {
                     key: k,
                     repeat: key.repeat,
                     now: now_ms(),
                 });
                 self.redraw_now();
-                self.save_history();
             }
-        }
-    }
-
-    /// Right-click a suggestion pill to forget that word.
-    fn on_right_click(&mut self) {
-        let (x, y) = (self.px as f64, self.py as f64);
-        let Some(i) = (0..self.n_sugg).find(|&i| self.sugg[i].contains(x, y)) else {
-            return;
-        };
-        if let Some(&word) = self.ctl.suggestions().get(self.sugg[i].idx) {
-            self.ctl.forget_word(word);
-            self.save_history();
-            self.request_redraw();
         }
     }
 
@@ -1163,6 +1214,12 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
     let state = unsafe { &mut *ptr };
     let result = match msg {
         WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE),
+        // A taskbar click (restore) activates the keyboard: hand focus back
+        // to the window the user was typing in, so keys land there.
+        WM_ACTIVATE if u32::from(wparam.0 as u16) != WA_INACTIVE && state.typing_in != 0 => {
+            let _ = unsafe { SetForegroundWindow(HWND(state.typing_in as *mut _)) };
+            LRESULT(0)
+        }
         WM_ERASEBKGND => LRESULT(1),
         WM_PAINT => {
             let mut ps = PAINTSTRUCT::default();
@@ -1173,6 +1230,21 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
         }
         WM_CLICK_ELSEWHERE => {
             state.on_click_elsewhere();
+            LRESULT(0)
+        }
+        WM_PHYS_KEY => {
+            state.on_phys_key(wparam.0 as u16, lparam.0 != 0);
+            LRESULT(0)
+        }
+        WM_RAISE => {
+            stay_above_taskbar(hwnd);
+            // The taskbar raises itself after it takes the foreground: again, later.
+            unsafe { SetTimer(Some(hwnd), RAISE_TIMER_ID, 300, None) };
+            LRESULT(0)
+        }
+        WM_TIMER if wparam.0 == RAISE_TIMER_ID => {
+            let _ = unsafe { KillTimer(Some(hwnd), RAISE_TIMER_ID) };
+            stay_above_taskbar(hwnd);
             LRESULT(0)
         }
         WM_TIMER => {
@@ -1214,11 +1286,6 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
             state.on_button(false);
             LRESULT(0)
         }
-        WM_RBUTTONDOWN => {
-            (state.px, state.py) = lparam_xy(lparam);
-            state.on_right_click();
-            LRESULT(0)
-        }
         WM_SIZE => {
             let w = (lparam.0 & 0xffff) as i32;
             let h = ((lparam.0 >> 16) & 0xffff) as i32;
@@ -1253,10 +1320,20 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
 }
 
 /// The Win32 UI. Runs until the keyboard is closed.
-pub fn run(backend: Box<dyn Backend>, neural: Option<NeuralEngine>) -> i32 {
-    let mut state = Box::new(State::new(backend, neural));
+pub fn run(backend: Box<dyn Backend>) -> i32 {
+    let mut state = Box::new(State::new(backend));
     let class_name: Vec<u16> = "osk-win-window\0".encode_utf16().collect();
-    let title: Vec<u16> = "OSK\0".encode_utf16().collect();
+    // One keyboard at a time: a second launch shows the running one and exits.
+    let mutex_name: Vec<u16> = "osk-win-single-instance\0".encode_utf16().collect();
+    let _single = unsafe { CreateMutexW(None, false, PCWSTR::from_raw(mutex_name.as_ptr())) };
+    if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
+        if let Ok(h) = unsafe { FindWindowW(PCWSTR::from_raw(class_name.as_ptr()), PCWSTR::null()) } {
+            let _ = unsafe { ShowWindow(h, SW_SHOWNOACTIVATE) };
+        }
+        state.backend.destroy();
+        return 0;
+    }
+    let title: Vec<u16> = "Teclado en pantalla\0".encode_utf16().collect();
     let hinst = match unsafe { GetModuleHandleW(None) } {
         Ok(h) => h,
         Err(e) => {
@@ -1280,10 +1357,10 @@ pub fn run(backend: Box<dyn Backend>, neural: Option<NeuralEngine>) -> i32 {
     unsafe { STATE_PTR = &mut *state as *mut State };
     let hwnd = match unsafe {
         CreateWindowExW(
-            WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
+            WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_APPWINDOW,
             PCWSTR::from_raw(class_name.as_ptr()),
             PCWSTR::from_raw(title.as_ptr()),
-            WS_POPUP,
+            WS_POPUP | WS_MINIMIZEBOX | WS_SYSMENU,
             state.pos_x,
             state.pos_y,
             state.width,
@@ -1302,10 +1379,26 @@ pub fn run(backend: Box<dyn Backend>, neural: Option<NeuralEngine>) -> i32 {
         }
     };
     state.hwnd = hwnd.0 as isize;
+    OSK_HWND.store(state.hwnd, Ordering::Relaxed);
     state.last_geom = (state.pos_x, state.pos_y, state.width, state.height);
     unsafe {
         let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
     }
+    stay_above_taskbar(hwnd);
+    let key_hook = unsafe { SetWindowsHookExW(WH_KEYBOARD_LL, Some(key_hook), None, 0) }
+        .inspect_err(|e| warn!("osk: no keyboard hook, real keys are not lit: {e}"))
+        .ok();
+    let fg_hook = unsafe {
+        SetWinEventHook(
+            EVENT_SYSTEM_FOREGROUND,
+            EVENT_SYSTEM_FOREGROUND,
+            None,
+            Some(foreground_changed),
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT,
+        )
+    };
     let mut msg = MSG::default();
     while unsafe { GetMessageW(&mut msg, None, 0, 0) }.as_bool() {
         unsafe {
@@ -1314,8 +1407,11 @@ pub fn run(backend: Box<dyn Backend>, neural: Option<NeuralEngine>) -> i32 {
         }
     }
     unsafe { STATE_PTR = std::ptr::null_mut() };
+    if let Some(h) = key_hook {
+        let _ = unsafe { UnhookWindowsHookEx(h) };
+    }
+    let _ = unsafe { UnhookWinEvent(fg_hook) };
     state.save_config();
-    state.save_history();
     // Never leave Alt stuck down in Windows.
     state.watch_mouse(false);
     state.set_alt(None);
@@ -1366,7 +1462,7 @@ mod tests {
     }
 
     fn state_with(presses: std::rc::Rc<std::cell::Cell<usize>>, events: Events) -> State {
-        let mut s = State::new(Box::new(MockBackend(presses, events)), None);
+        let mut s = State::new(Box::new(MockBackend(presses, events)));
         s.width = 800;
         s.height = 300;
         s
@@ -1391,21 +1487,132 @@ mod tests {
     }
 
     #[test]
-    fn win_is_a_momentary_tap_not_a_latch() {
-        let mut s = state();
-        let idx = point_at(&mut s, key::KEY_LEFTMETA);
-        s.on_button(true);
-        assert_eq!(s.ctl.mods().state(MOD_META), ModKeyState::Off, "Win must not latch");
-        assert!(matches!(s.interaction, Interaction::Press { key, .. } if key == idx));
-        s.on_button(false);
-        assert_eq!(s.flash_key, idx as i32);
-        assert_eq!(s.interaction, Interaction::Idle);
+    fn win_latches_for_the_next_key_like_the_windows_osk() {
+        // Win, Shift, S sends Win+Shift+S (the screenshot shortcut);
+        // Win alone sends nothing, so the Start menu stays shut.
+        let events = Events::default();
+        let mut s = state_logging(events.clone());
+        click(&mut s, key::KEY_LEFTMETA);
+        assert_eq!(s.ctl.mods().state(MOD_META), ModKeyState::Latched, "Win latches");
+        assert!(events.borrow().is_empty(), "a latched Win sends nothing yet");
+        click(&mut s, key::KEY_LEFTSHIFT);
+        click(&mut s, key::KEY_S);
+        assert_eq!(s.ctl.mods().state(MOD_META), ModKeyState::Off, "consumed by the key");
+        let ev = events.borrow();
+        let at = |code, down| ev.iter().position(|&e| e == (code, down)).unwrap();
+        assert!(at(key::KEY_LEFTMETA, true) < at(key::KEY_S, true));
+        assert!(at(key::KEY_LEFTSHIFT, true) < at(key::KEY_S, true));
+        assert!(at(key::KEY_S, false) < at(key::KEY_LEFTMETA, false));
     }
 
     fn click(s: &mut State, code: u16) {
         point_at(s, code);
         s.on_button(true);
         s.on_button(false);
+    }
+
+    fn latino(events: Events) -> State {
+        let mut s = state_logging(events);
+        s.layout_idx = ALL_LAYOUTS.iter().position(|l| l.name == "Latino").unwrap();
+        s
+    }
+
+    #[test]
+    fn fn_turns_the_number_row_into_f1_f12_for_one_key_like_osk_exe() {
+        let events = Events::default();
+        let mut s = latino(events.clone());
+        click(&mut s, key::KEY_FN);
+        assert!(s.fn_on, "Fn latches");
+        assert!(events.borrow().is_empty(), "Fn itself sends nothing");
+        assert_eq!(s.view().key_state_vis(key::KEY_FN), ModKeyState::Latched, "Fn drawn latched");
+        click(&mut s, key::KEY_1);
+        assert!(!s.fn_on, "Fn lasts for one key");
+        click(&mut s, key::KEY_1);
+        click(&mut s, key::KEY_FN);
+        click(&mut s, key::KEY_EQUAL);
+        assert_eq!(
+            *events.borrow(),
+            [
+                (key::KEY_F1, true),
+                (key::KEY_F1, false),
+                (key::KEY_1, true),
+                (key::KEY_1, false),
+                (key::KEY_F12, true),
+                (key::KEY_F12, false),
+            ]
+        );
+    }
+
+    #[test]
+    fn real_keyboard_keys_light_and_shift_altgr_switch_the_labels() {
+        let mut s = latino(Events::default());
+        assert!(!s.view().shift_shown());
+        s.on_phys_key(key::KEY_LEFTSHIFT, true);
+        s.on_phys_key(key::KEY_LEFTSHIFT, true); // auto-repeat
+        assert_eq!(s.held, [key::KEY_LEFTSHIFT]);
+        assert!(s.view().shift_shown(), "a held Shift shows the shifted labels");
+        s.on_phys_key(key::KEY_LEFTSHIFT, false);
+        assert!(s.held.is_empty());
+        assert!(!s.view().shift_shown());
+        s.on_phys_key(key::KEY_RIGHTALT, true);
+        assert!(s.view().altgr_shown(), "a held AltGr shows the AltGr labels");
+        // A held key draws pressed.
+        let idx = point_at(&mut s, key::KEY_A);
+        s.inside = false;
+        assert!(!s.view().key_drawn_down(idx));
+        s.on_phys_key(key::KEY_A, true);
+        assert!(s.view().key_drawn_down(idx));
+    }
+
+    #[test]
+    fn hook_events_map_to_the_codes_the_osk_injects() {
+        assert_eq!(phys_code(0xA0, 0x2A, false), Some(key::KEY_LEFTSHIFT));
+        assert_eq!(phys_code(0xBA, 0x27, false), Some(key::KEY_SEMICOLON), "Ñ by position");
+        assert_eq!(phys_code(0xA5, 0x38, true), Some(key::KEY_RIGHTALT));
+        assert_eq!(phys_code(0x25, 0x4B, true), Some(key::KEY_LEFT));
+        assert_eq!(phys_code(0x5B, 0x5B, true), Some(key::KEY_LEFTMETA));
+        assert_eq!(phys_code(0x2E, 0x53, true), Some(key::KEY_DELETE));
+    }
+
+    #[test]
+    fn both_enter_cells_are_one_key() {
+        let events = Events::default();
+        let mut s = latino(events.clone());
+        let cells: Vec<usize> = s
+            .layout()
+            .rows
+            .iter()
+            .enumerate()
+            .flat_map(|(r, row)| row.keys.iter().enumerate().filter(|(_, k)| k.code_u16() == key::KEY_ENTER).map(move |(i, _)| r * 100 + i))
+            .collect();
+        assert_eq!(cells.len(), 2);
+        assert!(s.view().same_key(cells[0], cells[1]));
+        assert!(!s.view().same_key(cells[0], cells[0] - 1));
+        // The lower cell types Enter too.
+        let (x, y, w, h) = s.view().key_rect(cells[1] / 100, cells[1] % 100);
+        s.px = (x + w / 2.0) as i32;
+        s.py = (y + h / 2.0) as i32;
+        s.inside = true;
+        s.on_button(true);
+        s.on_button(false);
+        assert_eq!(*events.borrow(), [(key::KEY_ENTER, true), (key::KEY_ENTER, false)]);
+    }
+
+    #[test]
+    fn fn_leaves_other_keys_alone_and_a_second_click_drops_it() {
+        let events = Events::default();
+        let mut s = latino(events.clone());
+        click(&mut s, key::KEY_FN);
+        click(&mut s, key::KEY_Q);
+        assert!(!s.fn_on);
+        click(&mut s, key::KEY_FN);
+        click(&mut s, key::KEY_FN);
+        assert!(!s.fn_on, "clicking Fn again turns it off");
+        click(&mut s, key::KEY_2);
+        assert_eq!(
+            *events.borrow(),
+            [(key::KEY_Q, true), (key::KEY_Q, false), (key::KEY_2, true), (key::KEY_2, false)]
+        );
     }
 
     #[test]
@@ -1536,13 +1743,10 @@ mod tests {
             height: 280,
             theme: "Nord".to_string(),
             layout: "65%+Num".to_string(),
-            tab_accepts_prediction: true,
-            prediction: false,
         };
         let json = serde_json::to_string_pretty(&cfg).unwrap();
         let loaded: PersistentConfig = serde_json::from_str(&json).unwrap();
         assert_eq!((loaded.pos_x, loaded.pos_y, loaded.width, loaded.height), (250, 350, 750, 280));
         assert_eq!((loaded.theme.as_str(), loaded.layout.as_str()), ("Nord", "65%+Num"));
-        assert!(loaded.tab_accepts_prediction && !loaded.prediction);
     }
 }
