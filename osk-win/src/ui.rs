@@ -25,7 +25,7 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    ReleaseCapture, SetCapture, TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT,
+    GetKeyState, ReleaseCapture, SetCapture, TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT, VK_CAPITAL,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetCursorPos,
@@ -55,7 +55,7 @@ use crate::cairo::{Context, FontSlant, FontWeight, Format, ImageSurface};
 #[cfg(feature = "dictation")]
 use crate::render::DictState;
 use crate::render::{
-    self, now_ms, BarLayout, KeyCache, Rect, Theme, THEMES, View, FONT, ViaChipLook, ViaFrame,
+    self, now_ms, BarLayout, KeyCache, Rect, Theme, THEMES, View, FONT,
 };
 
 /// Smallest surface the resize handle allows.
@@ -218,6 +218,8 @@ pub struct State {
     typing_in: isize,
     /// Keys a real keyboard holds down (KEY_* codes), lit on the osk.
     held: Vec<u16>,
+    /// Windows' Caps Lock state, flipped by every Caps Lock press.
+    caps_on: bool,
     layout_idx: usize,
     theme_idx: usize,
     theme: Theme,
@@ -248,6 +250,11 @@ fn windows_click(mut k: Key) -> Key {
             && (is_alt(code.get()) || matches!(code.get(), key::KEY_LEFTMETA | key::KEY_RIGHTMETA))
         {
             *click = Click::Latch;
+        }
+        // Caps Lock is Windows' own toggle, as in the Windows osk: tap the
+        // real key rather than shifting letters, so the two cannot disagree.
+        if *click == Click::Caps {
+            *click = Click::Tap;
         }
     }
     k
@@ -419,6 +426,7 @@ impl State {
             fn_on: false,
             typing_in: 0,
             held: Vec::new(),
+            caps_on: unsafe { GetKeyState(i32::from(VK_CAPITAL.0)) } & 1 != 0,
             layout_idx,
             theme_idx,
             theme: THEMES[theme_idx],
@@ -574,11 +582,8 @@ impl State {
             theme_menu_open: self.theme_menu_open,
             fn_on: self.fn_on,
             held: &self.held,
+            caps_on: self.caps_on,
             ctl: &self.ctl,
-            via: ViaFrame {
-                chip: ViaChipLook::Hidden,
-                status: None,
-            },
             #[cfg(feature = "dictation")]
             dict_state: self.dict_state,
             #[cfg(feature = "dictation")]
@@ -698,6 +703,7 @@ impl State {
         }
         if down {
             self.held.push(code);
+            self.caps_on ^= code == key::KEY_CAPSLOCK;
         } else {
             self.held.retain(|&c| c != code);
         }
@@ -965,6 +971,7 @@ impl State {
             self.request_redraw();
             return;
         }
+        self.caps_on ^= key.code_u16() == key::KEY_CAPSLOCK;
         // As in osk.exe, Fn lasts for one key.
         if std::mem::take(&mut self.fn_on) {
             if let Some(f) = fn_code(key.code_u16()) {
@@ -1333,6 +1340,7 @@ pub fn run(backend: Box<dyn Backend>) -> i32 {
         state.backend.destroy();
         return 0;
     }
+    crate::backend::start_input_helper();
     let title: Vec<u16> = "Teclado en pantalla\0".encode_utf16().collect();
     let hinst = match unsafe { GetModuleHandleW(None) } {
         Ok(h) => h,
@@ -1562,6 +1570,37 @@ mod tests {
         assert!(!s.view().key_drawn_down(idx));
         s.on_phys_key(key::KEY_A, true);
         assert!(s.view().key_drawn_down(idx));
+    }
+
+    #[test]
+    fn caps_lock_taps_windows_caps_lock_and_never_shifts_letters() {
+        let events = Events::default();
+        let mut s = latino(events.clone());
+        s.caps_on = false;
+        click(&mut s, key::KEY_CAPSLOCK);
+        assert!(s.caps_on, "the osk shows Windows' Caps Lock on");
+        assert_eq!(s.view().key_state_vis(key::KEY_CAPSLOCK), ModKeyState::Locked);
+        click(&mut s, key::KEY_A);
+        // Windows' own Caps Lock makes the capital: no Shift from the osk.
+        assert_eq!(
+            *events.borrow(),
+            [(key::KEY_CAPSLOCK, true), (key::KEY_CAPSLOCK, false), (key::KEY_A, true), (key::KEY_A, false)]
+        );
+        click(&mut s, key::KEY_CAPSLOCK);
+        assert!(!s.caps_on);
+    }
+
+    #[test]
+    fn a_real_caps_lock_press_flips_the_shown_state_once() {
+        let mut s = latino(Events::default());
+        s.caps_on = false;
+        s.on_phys_key(key::KEY_CAPSLOCK, true);
+        s.on_phys_key(key::KEY_CAPSLOCK, true); // auto-repeat
+        s.on_phys_key(key::KEY_CAPSLOCK, false);
+        assert!(s.caps_on);
+        s.on_phys_key(key::KEY_CAPSLOCK, true);
+        s.on_phys_key(key::KEY_CAPSLOCK, false);
+        assert!(!s.caps_on);
     }
 
     #[test]

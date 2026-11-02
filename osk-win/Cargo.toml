@@ -21,3 +21,9 @@ whisper-rs = { workspace = true, optional = true }
 [features]
 default = ["dictation"]
 dictation = ["dep:cpal", "dep:whisper-rs"]
+
+# Needs UIAccess (signed, in Program Files) to start, so no test harness.
+[[bin]]
+name = "osk-win-input"
+path = "src/bin/osk-win-input.rs"
+test = false

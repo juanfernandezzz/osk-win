@@ -196,8 +196,6 @@ fn main() {
             hover: args.hover.clone(),
             anim,
             clamp: args.clamp,
-            // osk-win has no VIA remap support.
-            via: Some("hidden".to_string()),
             menu: args.menu,
             mods: args.mods.clone(),
             pressed: args.pressed.clone(),

@@ -54,8 +54,6 @@ pub struct Theme {
     pub case: u32,
     pub key: u32,
     pub key_hov: u32,
-    #[allow(dead_code)]
-    pub key_hi: u32,
     pub key_shdw: u32,
     pub key_mod: u32,
     pub keytxt: u32,
@@ -71,15 +69,7 @@ pub struct Theme {
     pub on_txt: u32,
     pub key_press: u32,
     pub key_hold: u32,
-    #[allow(dead_code)]
-    pub hair: u32,
     pub edge: u32,
-    #[allow(dead_code)]
-    pub sugtxt: u32,
-    #[allow(dead_code)]
-    pub sugtxt_first: u32,
-    #[allow(dead_code)]
-    pub part: u32,
     pub close: u32,
     pub opacity: f64,
 }
@@ -94,7 +84,6 @@ pub static THEMES: &[Theme] = &[
         case: 0x1a1a1a,
         key: 0x333333,
         key_hov: 0xe5e5e5,
-        key_hi: 0x333333,
         key_shdw: 0x1a1a1a,
         key_mod: 0x333333,
         keytxt: 0xffffff,
@@ -108,11 +97,7 @@ pub static THEMES: &[Theme] = &[
         on_txt: 0x191919,
         key_press: 0xe5e5e5,
         key_hold: 0xe5e5e5,
-        hair: 0x333333,
         edge: 0x333333,
-        sugtxt: 0xa4a4a4,
-        sugtxt_first: 0xffffff,
-        part: 0xffffff,
         close: 0xffffff,
         opacity: 1.0,
     },
@@ -121,7 +106,6 @@ pub static THEMES: &[Theme] = &[
         case: 0x0f1420,
         key: 0x1b2132,
         key_hov: 0x313748,
-        key_hi: 0x292e3e,
         key_shdw: 0x090d15,
         key_mod: 0x181e2e,
         keytxt: 0xd5dcec,
@@ -135,11 +119,7 @@ pub static THEMES: &[Theme] = &[
         on_txt: 0x7de8da,
         key_press: 0x5ad6c6,
         key_hold: 0x38b2a3,
-        hair: 0x222732,
         edge: 0x283145,
-        sugtxt: 0x8a96b0,
-        sugtxt_first: 0x7de8da,
-        part: 0xe4e9f5,
         close: 0x7d88a3,
         opacity: 1.0,
     },
@@ -148,7 +128,6 @@ pub static THEMES: &[Theme] = &[
         case: 0x1a1b26,
         key: 0x24283b,
         key_hov: 0x343b58,
-        key_hi: 0x394b70,
         key_shdw: 0x13141c,
         key_mod: 0x212538,
         keytxt: 0xc0caf5,
@@ -162,11 +141,7 @@ pub static THEMES: &[Theme] = &[
         on_txt: 0xc0caf5,
         key_press: 0xbb9af7,
         key_hold: 0x9d7cd8,
-        hair: 0x292e42,
         edge: 0x323852,
-        sugtxt: 0x7aa2f7,
-        sugtxt_first: 0xbb9af7,
-        part: 0xff9e64,
         close: 0xf7768e,
         opacity: 1.0,
     },
@@ -175,7 +150,6 @@ pub static THEMES: &[Theme] = &[
         case: 0x11111b,
         key: 0x1e1e2e,
         key_hov: 0x313244,
-        key_hi: 0x45475a,
         key_shdw: 0x09090d,
         key_mod: 0x1b1b2a,
         keytxt: 0xcdd6f4,
@@ -189,11 +163,7 @@ pub static THEMES: &[Theme] = &[
         on_txt: 0xcba6f7,
         key_press: 0xcba6f7,
         key_hold: 0xb4befe,
-        hair: 0x313244,
         edge: 0x313244,
-        sugtxt: 0x89b4fa,
-        sugtxt_first: 0xcba6f7,
-        part: 0xa6e3a1,
         close: 0xf38ba8,
         opacity: 1.0,
     },
@@ -202,7 +172,6 @@ pub static THEMES: &[Theme] = &[
         case: 0x242933,
         key: 0x2e3440,
         key_hov: 0x434c5e,
-        key_hi: 0x4c566a,
         key_shdw: 0x1b1f27,
         key_mod: 0x2b313d,
         keytxt: 0xeceff4,
@@ -216,11 +185,7 @@ pub static THEMES: &[Theme] = &[
         on_txt: 0x88c0d0,
         key_press: 0x88c0d0,
         key_hold: 0x81a1c1,
-        hair: 0x3b4252,
         edge: 0x3f4859,
-        sugtxt: 0x81a1c1,
-        sugtxt_first: 0x88c0d0,
-        part: 0xa3be8c,
         close: 0xbf616a,
         opacity: 1.0,
     },
@@ -229,7 +194,6 @@ pub static THEMES: &[Theme] = &[
         case: 0x1d2021,
         key: 0x282828,
         key_hov: 0x3c3836,
-        key_hi: 0x504945,
         key_shdw: 0x141617,
         key_mod: 0x252525,
         keytxt: 0xebdbb2,
@@ -243,11 +207,7 @@ pub static THEMES: &[Theme] = &[
         on_txt: 0xfe8019,
         key_press: 0xfe8019,
         key_hold: 0xd65d0e,
-        hair: 0x3c3836,
         edge: 0x3c3836,
-        sugtxt: 0x83a598,
-        sugtxt_first: 0xfe8019,
-        part: 0xd3869b,
         close: 0xfb4934,
         opacity: 1.0,
     },
@@ -256,7 +216,6 @@ pub static THEMES: &[Theme] = &[
         case: 0x191724,
         key: 0x1f1d2e,
         key_hov: 0x26233a,
-        key_hi: 0x312f44,
         key_shdw: 0x13111c,
         key_mod: 0x222033,
         keytxt: 0xe0def4,
@@ -270,11 +229,7 @@ pub static THEMES: &[Theme] = &[
         on_txt: 0xebbcba,
         key_press: 0xebbcba,
         key_hold: 0xd49b99,
-        hair: 0x26233a,
         edge: 0x332f48,
-        sugtxt: 0x908caa,
-        sugtxt_first: 0xebbcba,
-        part: 0xeb6f92,
         close: 0xeb6f92,
         opacity: 1.0,
     },
@@ -283,7 +238,6 @@ pub static THEMES: &[Theme] = &[
         case: 0x21222c,
         key: 0x282a36,
         key_hov: 0x44475a,
-        key_hi: 0x6272a4,
         key_shdw: 0x191a21,
         key_mod: 0x292b3a,
         keytxt: 0xf8f8f2,
@@ -297,11 +251,7 @@ pub static THEMES: &[Theme] = &[
         on_txt: 0xbd93f9,
         key_press: 0xbd93f9,
         key_hold: 0x9a6bd8,
-        hair: 0x44475a,
         edge: 0x3b3e52,
-        sugtxt: 0x8be9fd,
-        sugtxt_first: 0xbd93f9,
-        part: 0xffb86c,
         close: 0xff5555,
         opacity: 1.0,
     },
@@ -310,7 +260,6 @@ pub static THEMES: &[Theme] = &[
         case: 0x232a2e,
         key: 0x2d353b,
         key_hov: 0x3d484d,
-        key_hi: 0x475258,
         key_shdw: 0x1e2326,
         key_mod: 0x2a3137,
         keytxt: 0xd3c6aa,
@@ -324,11 +273,7 @@ pub static THEMES: &[Theme] = &[
         on_txt: 0xa7c080,
         key_press: 0xa7c080,
         key_hold: 0x8fa86b,
-        hair: 0x343f44,
         edge: 0x3b464c,
-        sugtxt: 0x83c092,
-        sugtxt_first: 0xa7c080,
-        part: 0xe69875,
         close: 0xe67e80,
         opacity: 1.0,
     },
@@ -337,7 +282,6 @@ pub static THEMES: &[Theme] = &[
         case: 0x181820,
         key: 0x1f1f28,
         key_hov: 0x2a2a37,
-        key_hi: 0x363646,
         key_shdw: 0x16161d,
         key_mod: 0x22222d,
         keytxt: 0xdcd7ba,
@@ -351,11 +295,7 @@ pub static THEMES: &[Theme] = &[
         on_txt: 0x957fb8,
         key_press: 0x957fb8,
         key_hold: 0x7e699b,
-        hair: 0x2a2a37,
         edge: 0x31313f,
-        sugtxt: 0x7aa89f,
-        sugtxt_first: 0x957fb8,
-        part: 0xffa066,
         close: 0xc34043,
         opacity: 1.0,
     },
@@ -364,7 +304,6 @@ pub static THEMES: &[Theme] = &[
         case: 0x00212b,
         key: 0x073642,
         key_hov: 0x0d4857,
-        key_hi: 0x586e75,
         key_shdw: 0x001b22,
         key_mod: 0x002b36,
         keytxt: 0x93a1a1,
@@ -378,11 +317,7 @@ pub static THEMES: &[Theme] = &[
         on_txt: 0x268bd2,
         key_press: 0x268bd2,
         key_hold: 0x1d70a8,
-        hair: 0x073642,
         edge: 0x001b22,
-        sugtxt: 0x2aa198,
-        sugtxt_first: 0x268bd2,
-        part: 0xcb4b16,
         close: 0xdc322f,
         opacity: 1.0,
     },
@@ -391,7 +326,6 @@ pub static THEMES: &[Theme] = &[
         case: 0x120e24,
         key: 0x1a1638,
         key_hov: 0x282156,
-        key_hi: 0x3d2b78,
         key_shdw: 0x0d091b,
         key_mod: 0x15102c,
         keytxt: 0x00ffc2,
@@ -405,11 +339,7 @@ pub static THEMES: &[Theme] = &[
         on_txt: 0xff0055,
         key_press: 0xff0055,
         key_hold: 0xcc0044,
-        hair: 0x261e47,
         edge: 0x0d091b,
-        sugtxt: 0x965fd4,
-        sugtxt_first: 0xff0055,
-        part: 0xff5500,
         close: 0xff0055,
         opacity: 1.0,
     },
@@ -419,7 +349,6 @@ pub static THEMES: &[Theme] = &[
         case: 0x0b1a1f,
         key: 0x10242b,
         key_hov: 0x1b3740,
-        key_hi: 0x2f5560,
         key_shdw: 0x061014,
         key_mod: 0x0e2026,
         keytxt: 0xd8eef0,
@@ -433,11 +362,7 @@ pub static THEMES: &[Theme] = &[
         on_txt: 0xff8a80,
         key_press: 0xff8a80,
         key_hold: 0xe06a62,
-        hair: 0x1b3740,
         edge: 0x173039,
-        sugtxt: 0x7fd1c7,
-        sugtxt_first: 0xff8a80,
-        part: 0xffd38a,
         close: 0xff6b6b,
         opacity: 1.0,
     },
@@ -529,8 +454,6 @@ pub(crate) struct Rect {
     pub(crate) y: f64,
     pub(crate) w: f64,
     pub(crate) h: f64,
-    /// Item index (theme cards); 0 for the bar chips.
-    pub(crate) idx: usize,
 }
 
 impl Rect {
@@ -543,12 +466,10 @@ impl Rect {
 #[derive(Clone, Copy)]
 pub(crate) struct BarLayout {
     /// The bar's free area: the strip between the left margin and one
-    /// gap before the first chip, where the VIA status line may run. Measured once
-    /// here so both painters share it.
+    /// gap before the first chip, where the dictation waveform runs.
     pub(crate) text_left: f64,
     pub(crate) text_right: f64,
     pub(crate) layout_rect: Rect,
-    pub(crate) via_rect: Rect,
     pub(crate) theme_rect: Rect,
     pub(crate) close_rect: Rect,
     pub(crate) min_rect: Rect,
@@ -558,42 +479,6 @@ pub(crate) struct BarLayout {
     /// Scale the theme menu was laid out at (1.0 = natural size; less
     /// when the window is too small for it), for its text and padding.
     pub(crate) menu_scale: f64,
-}
-
-/// VIA chip look for one frame: dim with no device, normal with one,
-/// or armed (accent ring) while a remap session is up.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ViaChipLook {
-    /// No VIA device found: the chip looks dormant.
-    Dim,
-    /// Device attached, session not active.
-    Normal,
-    /// Session armed or captured: accent ring; the whole OSK is inert.
-    Armed,
-    /// No remap support on this platform (osk-win): the chip takes no
-    /// space and the layout chip moves up against the mic.
-    Hidden,
-}
-
-/// What the painters read about the remap session this frame. The
-/// Wayland UI maps its live session into it; `--render --via` fakes a
-/// state. Rendering stays free of osk-via: a frame is a look plus a
-/// line of text.
-#[derive(Clone)]
-pub(crate) struct ViaFrame {
-    pub(crate) chip: ViaChipLook,
-    /// None = nothing in the free area; Some = one status line there.
-    pub(crate) status: Option<String>,
-}
-
-impl ViaFrame {
-    /// The idle look: normal chip, no status line.
-    pub(crate) fn idle() -> Self {
-        ViaFrame {
-            chip: ViaChipLook::Normal,
-            status: None,
-        }
-    }
 }
 
 /// What the painters read, snapshotted from the UI state (or built
@@ -629,10 +514,10 @@ pub(crate) struct View<'a> {
     pub(crate) fn_on: bool,
     /// Keys a real keyboard holds down (KEY_* codes).
     pub(crate) held: &'a [u16],
+    /// Windows' Caps Lock is on.
+    pub(crate) caps_on: bool,
     /// Read access: modifiers.
     pub(crate) ctl: &'a Controller,
-    /// VIA chip look and status line for this frame.
-    pub(crate) via: ViaFrame,
     /// Mic button look.
     #[cfg(feature = "dictation")]
     pub(crate) dict_state: DictState,
@@ -741,9 +626,6 @@ pub struct RenderOpts {
     /// resize clamp would produce (used by the extreme showcase
     /// sizes).
     pub clamp: bool,
-    /// Faked VIA remap state: "idle", "nodevice", "armed",
-    /// "captured", "done", or "error". None = idle.
-    pub via: Option<String>,
     /// Draw the frame with the theme menu open.
     pub menu: bool,
     /// Modifier states to draw through the real engine, e.g.
@@ -760,45 +642,6 @@ pub struct RenderOpts {
     /// After the PNG, time this many more frames of the same state
     /// and print the per-frame cost.
     pub bench_frames: usize,
-}
-
-/// The `--render --via` state name, parsed into the chip look and
-/// status line `--render` fakes for that frame. The texts mirror what
-/// a live session reports.
-fn parse_via(name: &str) -> Result<ViaFrame, String> {
-    Ok(match name {
-        "idle" => ViaFrame::idle(),
-        "nodevice" => ViaFrame {
-            chip: ViaChipLook::Dim,
-            status: Some("VIA: no VIA keyboard found, plug one in".to_string()),
-        },
-        "armed" => ViaFrame {
-            chip: ViaChipLook::Armed,
-            status: Some("VIA: press and hold a key on the macropad (it will also type)".to_string()),
-        },
-        "captured" => ViaFrame {
-            chip: ViaChipLook::Armed,
-            status: Some("VIA: A captured, click a key to remap".to_string()),
-        },
-        "done" => ViaFrame {
-            chip: ViaChipLook::Normal,
-            status: Some("VIA: A -> Q".to_string()),
-        },
-        "error" => ViaFrame {
-            chip: ViaChipLook::Normal,
-            status: Some("VIA: device did not answer in time".to_string()),
-        },
-        // The bar osk-win draws: no VIA chip.
-        "hidden" => ViaFrame {
-            chip: ViaChipLook::Hidden,
-            status: None,
-        },
-        _ => {
-            return Err(format!(
-                "unknown via state '{name}' (idle|nodevice|armed|captured|done|error|hidden)"
-            ))
-        }
-    })
 }
 
 /// The `--render --dict` state name, parsed into the dictation look
@@ -866,11 +709,11 @@ fn anim_pin(opts: &RenderOpts) -> f64 {
     }
 }
 
-/// Whether a `--hover` name targets a measured bar element ("via",
+/// Whether a `--hover` name targets a measured bar element ("layout",
 /// "close", ...) instead of a key. These names are
 /// resolved after measure_bar; see [`bar_hover_target`].
 fn is_bar_hover_name(name: &str) -> bool {
-    matches!(name, "layout" | "via" | "theme" | "close" | "min" | "mic")
+    matches!(name, "layout" | "theme" | "close" | "min" | "mic")
 }
 
 /// The rect a `--hover` bar name points at: the element's drawn rect
@@ -878,7 +721,6 @@ fn is_bar_hover_name(name: &str) -> bool {
 fn bar_hover_target(bar: &BarLayout, name: &str) -> Option<Rect> {
     match name {
         "layout" => Some(bar.layout_rect),
-        "via" => Some(bar.via_rect),
         "theme" => Some(bar.theme_rect),
         "close" => Some(bar.close_rect),
         "min" => Some(bar.min_rect),
@@ -1124,12 +966,9 @@ pub fn run(opts: RenderOpts) -> Result<(), String> {
         theme_menu_open: opts.menu,
         fn_on: false,
         held: &[],
+        caps_on: ctl.mods().caps_lock(),
         handle_anim: anim_pin(&opts),
         ctl: &ctl,
-        via: match &opts.via {
-            Some(state) => parse_via(state)?,
-            None => ViaFrame::idle(),
-        },
         #[cfg(feature = "dictation")]
         dict_state,
         #[cfg(feature = "dictation")]
@@ -1312,7 +1151,6 @@ impl View<'_> {
             text_left: 0.0,
             text_right: 0.0,
             layout_rect: Rect::default(),
-            via_rect: Rect::default(),
             theme_rect: Rect::default(),
             close_rect: Rect::default(),
             min_rect: Rect::default(),
@@ -1333,7 +1171,6 @@ impl View<'_> {
             y: 0.0,
             w: cw,
             h: bh,
-            idx: 0,
         };
 
         // 1b. Minimize, left of close.
@@ -1343,7 +1180,6 @@ impl View<'_> {
             y: 0.0,
             w: cw,
             h: bh,
-            idx: 0,
         };
 
         let chip_pad = m.chip_pad();
@@ -1357,7 +1193,6 @@ impl View<'_> {
             y: 0.0,
             w: th_w,
             h: bh,
-            idx: 0,
         };
 
         // 2b. Mic button (dictation), left of the theme icon.
@@ -1370,45 +1205,27 @@ impl View<'_> {
                 y: 0.0,
                 w: mic_w,
                 h: bh,
-                idx: 0,
             };
             mx
         };
 
-        // 3. VIA chip ("VIA"), right of the layout chip, left of the
-        // mic/theme cluster.
+        // 3. Layout chip (e.g. "Latino"), left of the mic/theme cluster.
         #[cfg(not(feature = "dictation"))]
-        let via_right = th_x;
+        let lo_right = th_x;
         #[cfg(feature = "dictation")]
-        let via_right = mic_x;
-        let (via_x, via_w) = if self.via.chip == ViaChipLook::Hidden {
-            (via_right, 0.0)
-        } else {
-            let via_w = self.text_w(cr, "VIA", chip_fs) + 2.0 * chip_pad;
-            (via_right - via_w - chip_gap, via_w)
-        };
-        bar.via_rect = Rect {
-            x: via_x,
-            y: 0.0,
-            w: via_w,
-            h: bh,
-            idx: 0,
-        };
-
-        // 4. Layout chip (e.g. "65%", "65%+Num"), left of the VIA chip
+        let lo_right = mic_x;
         let lo_label = self.layout().name;
         let lo_tw = self.text_w(cr, lo_label, chip_fs);
         let lo_w = lo_tw + 2.0 * chip_pad;
-        let lo_x = via_x - lo_w - chip_gap;
+        let lo_x = lo_right - lo_w - chip_gap;
         bar.layout_rect = Rect {
             x: lo_x,
             y: 0.0,
             w: lo_w,
             h: bh,
-            idx: 0,
         };
 
-        // The bar's free area, for the VIA status line in paint_bar:
+        // The bar's free area, for the dictation waveform:
         // from the left margin to one gap before the first chip.
         let text_left = m.margin;
         let text_right = (lo_x - m.g).max(text_left);
@@ -1451,7 +1268,6 @@ impl View<'_> {
                 y: menu_y,
                 w: menu_w,
                 h: menu_h,
-                idx: 0,
             };
 
             let grid_y = menu_y + pad;
@@ -1463,7 +1279,6 @@ impl View<'_> {
                     y: grid_y + row as f64 * (row_h + row_gap),
                     w: col_w,
                     h: row_h,
-                    idx,
                 };
             }
         }
@@ -1550,7 +1365,7 @@ impl View<'_> {
 
     /// Whether letters show capitals: Caps Lock inverts the shown Shift.
     fn upper_shown(&self) -> bool {
-        osk_core::mods::Casing { shift: self.shift_shown(), ..self.ctl.mods().casing() }.letter_upper()
+        osk_core::mods::Casing { shift: self.shift_shown(), caps: self.caps_on }.letter_upper()
     }
 
     /// AltGr as the labels show it: latched on the osk or held on a keyboard.
@@ -1632,7 +1447,6 @@ impl View<'_> {
         let _ = cr.show_text(s);
     }
 
-    #[allow(dead_code)]
     fn draw_left(&self, cr: &Context, s: &str, x: f64, cy: f64, size: f64, color: u32) {
         cr.set_font_size(size);
         let Some(ext) = cr.text_extents(s).ok() else {
@@ -1712,17 +1526,11 @@ impl View<'_> {
         cr.rectangle(0.0, 0.0, self.width as f64, bh);
         cr.clip();
         cr.set_operator(Operator::Over);
-        // The bar's free area: the live waveform while dictation
-        // records, the remap status line while a VIA session is up.
-        // Transcribing draws nothing extra.
+        // The bar's free area: the live waveform while dictation records.
         #[cfg(feature = "dictation")]
         if self.dict_state == DictState::Recording {
             self.paint_waveform(cr, bar);
-        } else {
-            self.paint_free_area(cr, bar);
         }
-        #[cfg(not(feature = "dictation"))]
-        self.paint_free_area(cr, bar);
 
         // Layout chip
         self.paint_chip(
@@ -1732,35 +1540,6 @@ impl View<'_> {
             m.font_chip(),
             bh,
         );
-
-        // VIA chip: dim with no device, normal with one, accent ring
-        // while the remap session is armed or captured. Same box
-        // treatment as the other chips.
-        {
-            let vr = &bar.via_rect;
-            if vr.w > 0.0 {
-                let hov = self.inside && vr.contains(self.px as f64, self.py as f64);
-                let (bg, fg, border) = match self.via.chip {
-                    ViaChipLook::Dim => {
-                        (self.theme.key_mod, self.theme.modtxt, Some(self.theme.edge))
-                    }
-                    ViaChipLook::Normal if hov => {
-                        (self.theme.key_hov, self.theme.hov_txt, Some(self.theme.edge))
-                    }
-                    ViaChipLook::Normal => {
-                        (self.theme.key, self.theme.keytxt, Some(self.theme.edge))
-                    }
-                    ViaChipLook::Armed => {
-                        (self.theme.on_bg, self.theme.accent, Some(self.theme.accent))
-                    }
-                    // Zero width: this branch is never drawn.
-                    ViaChipLook::Hidden => (self.theme.key_mod, self.theme.modtxt, None),
-                };
-                self.paint_bar_box(cr, vr, bg, border);
-                cr.select_font_face(FONT, FontSlant::Normal, FontWeight::Normal);
-                self.draw_centered(cr, "VIA", vr.x + vr.w / 2.0, bh / 2.0, m.font_chip(), fg);
-            }
-        }
 
         // Theme icon button. Same box treatment; the open menu marks
         // the button with the accent.
@@ -1787,8 +1566,8 @@ impl View<'_> {
         );
 
         // Mic button (dictation), same box treatment. While dictation
-        // is engaged (recording or transcribing) it takes the armed
-        // VIA chip's look — accent ring, not the old filled accent —
+        // is engaged (recording or transcribing) it takes an accent
+        // ring, not a filled accent,
         // so the waveform, not the button, carries the visual.
         #[cfg(feature = "dictation")]
         {
@@ -1828,37 +1607,6 @@ impl View<'_> {
             if min_hov { self.theme.keytxt } else { self.theme.modtxt },
         );
         let _ = cr.restore();
-    }
-
-    /// The bar's free area when dictation is not recording: the remap
-    /// status line while a VIA session reports, empty otherwise.
-    fn paint_free_area(&self, cr: &Context, bar: &BarLayout) {
-        let m = self.metrics();
-        let bh = m.bar_h;
-        let fs = m.font_sug();
-        if let Some(status) = self.via.status.as_ref() {
-            cr.select_font_face(FONT, FontSlant::Normal, FontWeight::Normal);
-            // The line owns the pill area only: from the left margin to
-            // one gap before the first chip (BarLayout's free area,
-            // measured once), ending in "…" when it does not fit, so
-            // it never runs under the chips.
-            let x0 = bar.text_left;
-            let x1 = bar.text_right;
-            let avail = (x1 - x0).max(0.0);
-            let mut line = status.clone();
-            if self.text_w(cr, &line, fs) > avail {
-                let chars: Vec<char> = status.chars().collect();
-                let mut n = chars.len();
-                loop {
-                    line = chars[..n].iter().collect::<String>().trim_end().to_string() + "…";
-                    if n == 0 || self.text_w(cr, &line, fs) <= avail {
-                        break;
-                    }
-                    n -= 1;
-                }
-            }
-            self.draw_centered(cr, &line, (x0 + x1) / 2.0, bh / 2.0, fs, self.theme.accent);
-        }
     }
 
     /// The live waveform while dictation records: [`WAVE_BARS`]
@@ -2116,6 +1864,8 @@ impl View<'_> {
         KeyState {
             vis: if self.fn_on && key.code_u16() == key::KEY_FN {
                 ModKeyState::Latched
+            } else if key.code_u16() == key::KEY_CAPSLOCK {
+                if self.caps_on { ModKeyState::Locked } else { ModKeyState::Off }
             } else {
                 self.ctl.mods().key_visual(key)
             },
@@ -2147,12 +1897,12 @@ impl View<'_> {
     /// osk.exe's Enter spans two rows, two cells here: when `key` is
     /// Enter, every Enter cell, so both light as one key.
     fn enter_cells<'s>(&'s self, key: &Key) -> impl Iterator<Item = usize> + 's {
-        let enter = key.code_u16() == key::KEY_ENTER;
-        self.layout().rows.iter().enumerate().flat_map(move |(r, row)| {
+        let rows = if key.code_u16() == key::KEY_ENTER { self.layout().rows } else { &[] };
+        rows.iter().enumerate().flat_map(move |(r, row)| {
             row.keys
                 .iter()
                 .enumerate()
-                .filter(move |(_, k)| enter && k.code_u16() == key::KEY_ENTER)
+                .filter(|(_, k)| k.code_u16() == key::KEY_ENTER)
                 .map(move |(i, _)| r * 100 + i)
         })
     }
