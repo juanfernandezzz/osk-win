@@ -104,6 +104,7 @@ pub fn vk_for(code: u16) -> Option<u16> {
         key::KEY_SYSRQ => Some(0x2C),
         key::KEY_PAUSE => Some(0x13),
         key::KEY_COMPOSE => Some(0x5D),
+        key::KEY_MASK => Some(0xE8),
         // Numpad operators.
         key::KEY_KPASTERISK => Some(0x6A),
         key::KEY_KPMINUS => Some(0x6D),

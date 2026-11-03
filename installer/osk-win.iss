@@ -2,7 +2,7 @@
 ; Build: cargo build --release -p osk-win --no-default-features
 ;        ISCC.exe installer\osk-win.iss   -> installer\Output\osk-win-setup.exe
 
-#define AppVersion "0.2.0"
+#define AppVersion "0.3.0"
 
 [Setup]
 AppId={{6B0E2A4C-5F3B-4C1E-9A7D-0F5C2D8E7B41}

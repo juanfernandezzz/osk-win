@@ -142,6 +142,12 @@ impl Controller {
         }
     }
 
+    /// A key typed elsewhere (a real keyboard, a mouse click) was the "next
+    /// key": latched modifiers turn off, locked ones stay.
+    pub fn consume_latched(&mut self) {
+        self.mods.consume_latched();
+    }
+
     /// Tap an injectable key: build the chord, inject it, consume
     /// latched modifiers. Non-tap keys are ignored.
     pub fn tap_key(&mut self, k: &Key, sink: &mut dyn KeySink) {

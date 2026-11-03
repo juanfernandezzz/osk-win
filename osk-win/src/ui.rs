@@ -43,7 +43,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use osk_core::controller::{Clicked, Controller};
 use osk_core::interaction::{self, Event as IEvent, Interaction};
 use osk_core::key::{fn_code, key, Click, Key, KeyKind, Layout};
-use osk_core::mods::{ModKeyState, DOUBLE_CLICK_MS, MOD_ALT};
+use osk_core::mods::{mod_index, ModKeyState, MOD_META, NMODS};
 use osk_core::layout::ALL_LAYOUTS;
 use osk_core::metrics::Metrics;
 #[cfg(feature = "dictation")]
@@ -198,7 +198,7 @@ pub struct State {
     flash_key: i32,
     flash_until: u64,
     /// The Alt key this osk holds down in Windows, if any.
-    alt_down: Option<u16>,
+    mods_down: [Option<u16>; NMODS],
     /// The mouse hook watching for a click elsewhere while Alt is latched.
     mouse_hook: Option<HHOOK>,
     grid_cols: i32,
@@ -238,9 +238,9 @@ pub struct State {
     quit: bool,
 }
 
-/// Alt latches like Ctrl on Windows, and [`State::sync_alt`] holds it
-/// down while latched, as the Windows osk does. The shared layouts make
-/// it a momentary tap, but a lone Alt press+release opens the focused
+/// Win and Alt latch like Ctrl on Windows, and [`State::sync_mods`] holds
+/// every latched modifier down, as the Windows osk does. The shared layouts
+/// make them a momentary tap, but a lone Alt press+release opens the focused
 /// app's menu bar (KeyTips, accelerator underlines) and leaves it showing.
 fn windows_click(mut k: Key) -> Key {
     if let KeyKind::Inject { code, click } = &mut k.kind {
@@ -264,23 +264,29 @@ fn is_alt(code: u16) -> bool {
     matches!(code, key::KEY_LEFTALT | key::KEY_RIGHTALT)
 }
 
-/// Injects through the backend, tracking whether Alt is down: a tap
-/// under a latched Alt sends its own Alt press and release.
-struct AltSink<'a> {
+/// Injects through the backend, tracking which modifiers are down: a tap
+/// under a latched modifier sends its own press and release of it.
+struct ModSink<'a> {
     b: &'a mut dyn Backend,
-    alt: &'a mut Option<u16>,
+    down: &'a mut [Option<u16>; NMODS],
 }
 
-impl KeySink for AltSink<'_> {
+impl KeySink for ModSink<'_> {
     fn press(&mut self, code: u16) {
-        if is_alt(code) {
-            *self.alt = Some(code);
+        if let Some(slot) = mod_index(code) {
+            self.down[slot] = Some(code);
         }
         self.b.press(code);
     }
     fn release(&mut self, code: u16) {
-        if is_alt(code) {
-            *self.alt = None;
+        let slot = mod_index(code);
+        if let Some(slot) = slot {
+            self.down[slot] = None;
+        }
+        // Win pressed and released with no key between opens Start: put one between.
+        if slot == Some(MOD_META) {
+            self.b.press(key::KEY_MASK);
+            self.b.release(key::KEY_MASK);
         }
         self.b.release(code);
     }
@@ -411,7 +417,7 @@ impl State {
             drag_origin: (0, 0),
             flash_key: -1,
             flash_until: 0,
-            alt_down: None,
+            mods_down: [None; NMODS],
             mouse_hook: None,
             grid_cols,
             handle_hover: false,
@@ -667,18 +673,19 @@ impl State {
 
     // ---- input ----
 
-    /// Hold Alt down in Windows exactly while the controller has it
-    /// latched or locked, so other apps see it held (Alt+click, Alt+drag).
-    fn sync_alt(&mut self) {
+    /// Hold each modifier down in Windows exactly while the controller has
+    /// it latched or locked, so other apps and a real keyboard see it held
+    /// (Alt+click, Alt+drag, or Win on the osk then Shift+S on the keyboard).
+    fn sync_mods(&mut self) {
         let mods = self.ctl.mods();
-        let want = mods.state(MOD_ALT).is_active().then(|| mods.code(MOD_ALT));
-        let latched = mods.state(MOD_ALT) == ModKeyState::Latched;
-        self.set_alt(want);
+        let want = std::array::from_fn(|s| mods.state(s).is_active().then(|| mods.code(s)));
+        let latched = (0..NMODS).any(|s| mods.state(s) == ModKeyState::Latched);
+        self.set_mods(want);
         self.watch_mouse(latched);
     }
 
     /// Watch for a mouse click in another window: it is the "next key" a
-    /// latched Alt applies to, as in the Windows osk (Alt+click).
+    /// latched modifier applies to, as in the Windows osk (Alt+click).
     fn watch_mouse(&mut self, on: bool) {
         if on == self.mouse_hook.is_some() || self.hwnd == 0 {
             return;
@@ -690,7 +697,7 @@ impl State {
         OSK_HWND.store(self.hwnd, Ordering::Relaxed);
         match unsafe { SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook), None, 0) } {
             Ok(hook) => self.mouse_hook = Some(hook),
-            Err(e) => warn!("osk: no mouse hook, Alt+click keeps Alt down: {e}"),
+            Err(e) => warn!("osk: no mouse hook, a click elsewhere keeps latched modifiers down: {e}"),
         }
     }
 
@@ -704,53 +711,51 @@ impl State {
         if down {
             self.held.push(code);
             self.caps_on ^= code == key::KEY_CAPSLOCK;
+            if mod_index(code).is_none() {
+                // A real key is the "next key" a latched osk modifier applies
+                // to: Win on the osk, then Shift+S on the keyboard.
+                self.ctl.consume_latched();
+                self.sync_mods();
+            }
         } else {
             self.held.retain(|&c| c != code);
         }
         self.request_redraw();
     }
 
-    /// A mouse click elsewhere finished under a latched Alt: release it.
+    /// A mouse click elsewhere finished under latched modifiers: release them.
     fn on_click_elsewhere(&mut self) {
-        let mods = self.ctl.mods();
-        if mods.state(MOD_ALT) != ModKeyState::Latched {
-            return;
-        }
-        // A click outside the double-click window takes the latch to off.
-        let alt = windows_click(Key::momentary("alt", mods.code(MOD_ALT), 25));
-        let mut sink = AltSink {
-            b: self.backend.as_mut(),
-            alt: &mut self.alt_down,
-        };
-        self.ctl.click_key(&alt, now_ms() + DOUBLE_CLICK_MS, &mut sink);
-        self.sync_alt();
+        self.ctl.consume_latched();
+        self.sync_mods();
         self.request_redraw();
     }
 
-    fn set_alt(&mut self, want: Option<u16>) {
-        if want == self.alt_down {
-            return;
-        }
-        let mut sink = AltSink {
+    fn set_mods(&mut self, want: [Option<u16>; NMODS]) {
+        let mut sink = ModSink {
             b: self.backend.as_mut(),
-            alt: &mut self.alt_down,
+            down: &mut self.mods_down,
         };
-        if let Some(code) = *sink.alt {
-            sink.release(code);
-        }
-        if let Some(code) = want {
-            sink.press(code);
+        for (slot, want) in want.into_iter().enumerate() {
+            if want == sink.down[slot] {
+                continue;
+            }
+            if let Some(code) = sink.down[slot] {
+                sink.release(code);
+            }
+            if let Some(code) = want {
+                sink.press(code);
+            }
         }
     }
 
     fn tap_key(&mut self, idx: usize) {
         let k = *self.key_of(idx);
-        let mut sink = AltSink {
+        let mut sink = ModSink {
             b: self.backend.as_mut(),
-            alt: &mut self.alt_down,
+            down: &mut self.mods_down,
         };
         self.ctl.tap_key(&k, &mut sink);
-        self.sync_alt();
+        self.sync_mods();
         self.redraw_now();
     }
 
@@ -980,12 +985,12 @@ impl State {
             self.request_redraw();
         }
         // All keyboard logic lives in the controller.
-        let mut sink = AltSink {
+        let mut sink = ModSink {
             b: self.backend.as_mut(),
-            alt: &mut self.alt_down,
+            down: &mut self.mods_down,
         };
         let clicked = self.ctl.click_key(&key, now_ms(), &mut sink);
-        self.sync_alt();
+        self.sync_mods();
         match clicked {
             Clicked::Inert => {}
             Clicked::Momentary => {
@@ -1072,9 +1077,9 @@ impl State {
                 if let Some(map) = self.ctl.charmap() {
                     let pause = || std::thread::sleep(std::time::Duration::from_millis(20));
                     if let Err(e) = type_text(
-                        &mut AltSink {
+                        &mut ModSink {
                             b: self.backend.as_mut(),
-                            alt: &mut self.alt_down,
+                            down: &mut self.mods_down,
                         },
                         map,
                         &text,
@@ -1082,7 +1087,7 @@ impl State {
                     ) {
                         warn!("[dictate] failed to type: {e:?}");
                     }
-                    self.sync_alt();
+                    self.sync_mods();
                 }
             }
             Ok(_) => {}
@@ -1126,12 +1131,12 @@ impl State {
             self.flash_key = -1;
             self.request_redraw();
         }
-        let mut sink = AltSink {
+        let mut sink = ModSink {
             b: self.backend.as_mut(),
-            alt: &mut self.alt_down,
+            down: &mut self.mods_down,
         };
         self.ctl.tick(now, &mut sink);
-        self.sync_alt();
+        self.sync_mods();
         if self.handle_anim_since.is_some_and(|s| now.saturating_sub(s) <= render::HANDLE_ANIM_MS + ANIM_FRAME_MS) {
             self.request_redraw();
         }
@@ -1340,7 +1345,6 @@ pub fn run(backend: Box<dyn Backend>) -> i32 {
         state.backend.destroy();
         return 0;
     }
-    crate::backend::start_input_helper();
     let title: Vec<u16> = "Teclado en pantalla\0".encode_utf16().collect();
     let hinst = match unsafe { GetModuleHandleW(None) } {
         Ok(h) => h,
@@ -1393,6 +1397,9 @@ pub fn run(backend: Box<dyn Backend>) -> i32 {
         let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
     }
     stay_above_taskbar(hwnd);
+    // Both start processes: kept off the path to the first frame.
+    std::thread::spawn(crate::backend::start_input_helper);
+    crate::update::check_at_startup();
     let key_hook = unsafe { SetWindowsHookExW(WH_KEYBOARD_LL, Some(key_hook), None, 0) }
         .inspect_err(|e| warn!("osk: no keyboard hook, real keys are not lit: {e}"))
         .ok();
@@ -1422,7 +1429,7 @@ pub fn run(backend: Box<dyn Backend>) -> i32 {
     state.save_config();
     // Never leave Alt stuck down in Windows.
     state.watch_mouse(false);
-    state.set_alt(None);
+    state.set_mods([None; NMODS]);
     state.backend.destroy();
     0
 }
@@ -1431,7 +1438,7 @@ pub fn run(backend: Box<dyn Backend>) -> i32 {
 mod tests {
     use super::*;
     use osk_core::key::key;
-    use osk_core::mods::{ModKeyState, DOUBLE_CLICK_MS, MOD_META};
+    use osk_core::mods::{ModKeyState, DOUBLE_CLICK_MS, MOD_ALT, MOD_CTRL, MOD_META};
 
     /// Counts the key presses it is asked to inject, and logs every
     /// event as (code, down).
@@ -1497,12 +1504,13 @@ mod tests {
     #[test]
     fn win_latches_for_the_next_key_like_the_windows_osk() {
         // Win, Shift, S sends Win+Shift+S (the screenshot shortcut);
-        // Win alone sends nothing, so the Start menu stays shut.
+        // a latched Win is held down in Windows, so a real keyboard's
+        // Shift+S joins it, and the Start menu stays shut.
         let events = Events::default();
         let mut s = state_logging(events.clone());
         click(&mut s, key::KEY_LEFTMETA);
         assert_eq!(s.ctl.mods().state(MOD_META), ModKeyState::Latched, "Win latches");
-        assert!(events.borrow().is_empty(), "a latched Win sends nothing yet");
+        assert_eq!(*events.borrow(), [(key::KEY_LEFTMETA, true)], "Win is held down");
         click(&mut s, key::KEY_LEFTSHIFT);
         click(&mut s, key::KEY_S);
         assert_eq!(s.ctl.mods().state(MOD_META), ModKeyState::Off, "consumed by the key");
@@ -1511,6 +1519,8 @@ mod tests {
         assert!(at(key::KEY_LEFTMETA, true) < at(key::KEY_S, true));
         assert!(at(key::KEY_LEFTSHIFT, true) < at(key::KEY_S, true));
         assert!(at(key::KEY_S, false) < at(key::KEY_LEFTMETA, false));
+        // A key sits between Win down and up, so the Start menu stays shut.
+        assert!(at(key::KEY_MASK, true) < at(key::KEY_LEFTMETA, false));
     }
 
     fn click(s: &mut State, code: u16) {
@@ -1604,6 +1614,31 @@ mod tests {
     }
 
     #[test]
+    fn a_real_key_ends_a_latched_modifier_but_a_real_modifier_does_not() {
+        // Ctrl on the osk, Shift then Esc on the keyboard: Ctrl+Shift+Esc.
+        let events = Events::default();
+        let mut s = latino(events.clone());
+        click(&mut s, key::KEY_LEFTCTRL);
+        assert_eq!(*events.borrow(), [(key::KEY_LEFTCTRL, true)], "Ctrl is held down in Windows");
+        s.on_phys_key(key::KEY_LEFTSHIFT, true);
+        assert_eq!(s.ctl.mods().state(MOD_CTRL), ModKeyState::Latched, "a real Shift keeps it");
+        s.on_phys_key(key::KEY_ESC, true);
+        assert_eq!(s.ctl.mods().state(MOD_CTRL), ModKeyState::Off, "a real Esc is the next key");
+        assert_eq!(*events.borrow(), [(key::KEY_LEFTCTRL, true), (key::KEY_LEFTCTRL, false)]);
+    }
+
+    #[test]
+    fn a_locked_modifier_survives_real_keys() {
+        let mut s = latino(Events::default());
+        let ctrl = key::KEY_LEFTCTRL;
+        click(&mut s, ctrl);
+        click(&mut s, ctrl); // double click locks
+        s.on_phys_key(key::KEY_ESC, true);
+        assert_eq!(s.ctl.mods().state(MOD_CTRL), ModKeyState::Locked);
+        assert_eq!(s.mods_down[MOD_CTRL], Some(ctrl));
+    }
+
+    #[test]
     fn hook_events_map_to_the_codes_the_osk_injects() {
         assert_eq!(phys_code(0xA0, 0x2A, false), Some(key::KEY_LEFTSHIFT));
         assert_eq!(phys_code(0xBA, 0x27, false), Some(key::KEY_SEMICOLON), "Ñ by position");
@@ -1670,7 +1705,7 @@ mod tests {
         let ev = events.borrow();
         assert!(ev.contains(&(key::KEY_TAB, true)));
         assert_eq!(ev.last(), Some(&(alt, false)), "Alt released after the key");
-        assert_eq!(s.alt_down, None);
+        assert_eq!(s.mods_down[MOD_ALT], None);
     }
 
     #[test]
@@ -1682,7 +1717,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(DOUBLE_CLICK_MS + 50));
         click(&mut s, alt);
         assert_eq!(*events.borrow(), [(alt, true), (alt, false)]);
-        assert_eq!(s.alt_down, None);
+        assert_eq!(s.mods_down[MOD_ALT], None);
     }
 
     #[test]
@@ -1708,7 +1743,7 @@ mod tests {
         click(&mut s, alt);
         s.on_click_elsewhere();
         assert_eq!(s.ctl.mods().state(MOD_ALT), ModKeyState::Locked);
-        assert_eq!(s.alt_down, Some(alt));
+        assert_eq!(s.mods_down[MOD_ALT], Some(alt));
     }
 
     #[test]
@@ -1720,7 +1755,7 @@ mod tests {
         click(&mut s, alt);
         assert_eq!(s.ctl.mods().state(MOD_ALT), ModKeyState::Locked);
         click(&mut s, key::KEY_TAB);
-        assert_eq!(s.alt_down, Some(alt), "still held after the key");
+        assert_eq!(s.mods_down[MOD_ALT], Some(alt), "still held after the key");
         assert_eq!(events.borrow().last(), Some(&(alt, true)));
     }
 

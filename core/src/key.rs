@@ -103,6 +103,9 @@ pub mod key {
     pub const KEY_COMPOSE: u16 = 127;
     /// osk.exe's Fn: never injected, the UI swaps the number row to F1..F12.
     pub const KEY_FN: u16 = 0x1d0;
+    /// An unassigned key (VK 0xE8) pressed between Win down and up, so a held
+    /// Win released with no other key does not open Start.
+    pub const KEY_MASK: u16 = 0x1d1;
     pub const KEY_LEFTMETA: u16 = 125;
     pub const KEY_RIGHTMETA: u16 = 126;
     pub const KEY_KPASTERISK: u16 = 55;

@@ -24,6 +24,7 @@ mod backend;
 mod cairo;
 mod render;
 mod ui;
+mod update;
 mod vk;
 
 #[cfg(feature = "dictation")]
