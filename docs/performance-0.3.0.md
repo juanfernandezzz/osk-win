@@ -162,8 +162,11 @@ Sources:
 - [Benchmark checklist](https://github.com/cursor/plugins/blob/main/pstack/skills/benchmark-checklist/SKILL.md): physical/Amdahl limits, valid work counts, comparable tuning, limiter attribution and alternating repeated trials.
 - [Property-based testing](https://github.com/trailofbits/skills/tree/main/plugins/property-based-testing/skills/property-based-testing): independent equivalence oracles, nonvacuous cases, boundaries and reproducibility. Used deterministic cases, without a new dependency.
 
-The external skill texts were read and applied. Their persistent installation
-was blocked by the environment's write/network restrictions and unavailable
-offline `skills` npm package; installation is not claimed. The standalone
-combined skill is delivered separately and is intentionally absent from this
-repository.
+During the first pass, the external skill texts were read and applied, but
+installation was blocked. Installation was subsequently completed in ChatGPT:
+find-skills, benchmark-checklist and property-based-testing are now available
+as installed skills, and their installed contents were read for the follow-up.
+See [the follow-up audit](performance-0.3.0-follow-up.md) for its findings and
+remaining validation gaps. Installation in a local Codex/Claude directory is
+not claimed. The standalone combined skill is delivered separately, omits
+find-skills content, and is intentionally absent from this repository.
