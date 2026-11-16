@@ -4,6 +4,7 @@
 //! One copy of the geometry and painting code means the two paths
 //! cannot drift. Nothing here touches Wayland.
 
+use std::borrow::Cow;
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::LazyLock;
@@ -431,6 +432,10 @@ fn set_src(cr: &Context, argb: u32) {
 
 /// Rounded rectangle subpath.
 fn rrect(cr: &Context, x: f64, y: f64, w: f64, h: f64, rad: f64) {
+    if rad == 0.0 {
+        cr.rectangle(x, y, w, h);
+        return;
+    }
     let mut r = rad;
     if r > w / 2.0 {
         r = w / 2.0;
@@ -1393,13 +1398,12 @@ impl View<'_> {
     /// Draw the at-rest keyboard into a fresh offscreen surface; None
     /// when cairo cannot make one, and the frame draws it directly.
     fn build_cache(&self, key: CacheKey) -> Option<KeyCache> {
-        let surface = ImageSurface::create(Format::ARgb32, self.buf_w, self.buf_h).ok()?;
+        let surface = ImageSurface::create_offscreen(Format::ARgb32, self.buf_w, self.buf_h).ok()?;
         let cr = Context::new(&surface).ok()?;
         self.scale_to_logical(&cr);
         cr.select_font_face(FONT, FontSlant::Normal, FontWeight::Normal);
         self.paint_rest(&cr);
         drop(cr);
-        surface.flush();
         Some(KeyCache { key, surface })
     }
 
@@ -1955,39 +1959,40 @@ impl View<'_> {
         };
         // The big label is what the key types now; the corners hint the
         // other layers, Shift top-left (as osk.exe) and AltGr top-right.
-        let disp: String;
+        let disp: Cow<'_, str>;
         let altgr = self.altgr_shown();
         let mut hint_shift = None;
         let mut hint_altgr = key.altgr_label.filter(|_| !altgr);
         if key.letter {
             let c = key.label.and_then(|l| l.chars().next()).unwrap_or(' ');
             disp = if let (true, Some(l)) = (altgr, key.altgr_label) {
-                l.to_string()
+                l.into()
             } else if self.upper_shown() {
-                c.to_uppercase().to_string()
+                c.to_uppercase().to_string().into()
             } else {
-                c.to_lowercase().to_string()
+                c.to_lowercase().to_string().into()
             };
         } else if self.fn_on && fn_code(code).is_some() {
             // The Fn keys run 1..= after 0 in order: F1..F12.
-            disp = format!("F{}", code - key::KEY_1 + 1);
+            const LABELS: [&str; 12] = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"];
+            disp = LABELS[(code - key::KEY_1) as usize].into();
             hint_altgr = None;
         } else if let (true, Some(l)) = (altgr, key.altgr_label) {
-            disp = l.to_string();
+            disp = l.into();
             hint_shift = key.shift_label;
         } else if let Some(l) = key.label {
             match (self.shift_shown(), key.shift_label) {
                 (true, Some(sl)) => {
-                    disp = sl.to_string();
+                    disp = sl.into();
                     hint_shift = Some(l);
                 }
                 (_, sl) => {
-                    disp = l.to_string();
+                    disp = l.into();
                     hint_shift = sl;
                 }
             }
         } else {
-            disp = String::new();
+            disp = "".into();
         }
         // The cell is edge-to-edge; the visible gap g is shared: half
         // of it is inset into each neighbouring key.
@@ -2038,15 +2043,15 @@ impl View<'_> {
                 let n = line.chars().count().max(1) as f64;
                 fs = fs.min(cw / (0.62 * n));
             }
-            let lines: Vec<&str> = disp.lines().collect();
-            if lines.len() == 1 {
+            let line_count = disp.lines().count();
+            if line_count == 1 {
                 // Room for the corner hints: the big label sits a little low.
                 let dy = if hint_shift.or(hint_altgr).is_some() { 0.2 * fs } else { 0.0 };
-                self.draw_centered(cr, lines[0], rx + rw / 2.0, ry + rh / 2.0 + dy, fs, label);
+                self.draw_centered(cr, disp.lines().next().unwrap(), rx + rw / 2.0, ry + rh / 2.0 + dy, fs, label);
             } else {
                 let lh = 1.3 * fs;
-                let top = ry + rh / 2.0 - (lines.len() as f64 - 1.0) * lh / 2.0;
-                for (i, line) in lines.iter().enumerate() {
+                let top = ry + rh / 2.0 - (line_count as f64 - 1.0) * lh / 2.0;
+                for (i, line) in disp.lines().enumerate() {
                     self.draw_centered(cr, line, rx + rw / 2.0, top + i as f64 * lh, fs, label);
                 }
             }
@@ -2127,3 +2132,4 @@ mod tests {
         assert_eq!(mix_color(0x102030, 0x506070, 0.5), 0x304050);
     }
 }
+

@@ -1,0 +1,3428 @@
+{
+  "executables": {
+    "baseline": {
+      "sha256": "bfa814a243ea9c5d13050c31ea0cf87d6d1a6fbab1074baa2f15a5024f6cd2bd",
+      "size": 1840128
+    },
+    "candidate": {
+      "sha256": "94610e328bebe4e540d59f979f3db9538494dd06ea642e29cc2a069e0508f228",
+      "size": 1845248
+    }
+  },
+  "runs": 5,
+  "frames": 500,
+  "scenarios": {
+    "hover_800": {
+      "args": [
+        "--layout",
+        "Latino",
+        "--size",
+        "800x300",
+        "--hover",
+        "A"
+      ],
+      "samples": {
+        "baseline": [
+          {
+            "wall_ms": 1241.882300000725,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 2.07,
+            "min_ms": 1.146,
+            "max_ms": 20.126
+          },
+          {
+            "wall_ms": 720.8288999991055,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.14,
+            "min_ms": 1.004,
+            "max_ms": 3.061
+          },
+          {
+            "wall_ms": 711.5303999999014,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.129,
+            "min_ms": 0.996,
+            "max_ms": 2.385
+          },
+          {
+            "wall_ms": 652.8686000001471,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.046,
+            "min_ms": 1.002,
+            "max_ms": 2.122
+          },
+          {
+            "wall_ms": 776.680099999794,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.17,
+            "min_ms": 1.005,
+            "max_ms": 3.413
+          }
+        ],
+        "candidate": [
+          {
+            "wall_ms": 1257.054200001221,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.838,
+            "min_ms": 1.144,
+            "max_ms": 6.944
+          },
+          {
+            "wall_ms": 939.0335000007326,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.427,
+            "min_ms": 1.105,
+            "max_ms": 19.329
+          },
+          {
+            "wall_ms": 666.3853999998537,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.024,
+            "min_ms": 0.971,
+            "max_ms": 2.427
+          },
+          {
+            "wall_ms": 644.1106000002037,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.027,
+            "min_ms": 0.977,
+            "max_ms": 2.404
+          },
+          {
+            "wall_ms": 827.4259999998321,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.177,
+            "min_ms": 1.106,
+            "max_ms": 3.313
+          }
+        ]
+      },
+      "summary": {
+        "baseline": {
+          "median_ms": 1.14,
+          "range_ms": [
+            1.046,
+            2.07
+          ]
+        },
+        "candidate": {
+          "median_ms": 1.177,
+          "range_ms": [
+            1.024,
+            1.838
+          ]
+        }
+      }
+    },
+    "menu_800": {
+      "args": [
+        "--layout",
+        "Latino",
+        "--size",
+        "800x300",
+        "--menu"
+      ],
+      "samples": {
+        "baseline": [
+          {
+            "wall_ms": 1681.73299999944,
+            "sha256": "4ecfe52fb219c439ea3e765ab66897b59e17693e3af0c5ff1cde6ef739ae05fd",
+            "median_ms": 2.684,
+            "min_ms": 2.327,
+            "max_ms": 8.685
+          },
+          {
+            "wall_ms": 2765.8140000003186,
+            "sha256": "4ecfe52fb219c439ea3e765ab66897b59e17693e3af0c5ff1cde6ef739ae05fd",
+            "median_ms": 4.916,
+            "min_ms": 2.686,
+            "max_ms": 36.938
+          },
+          {
+            "wall_ms": 2207.4499999998807,
+            "sha256": "4ecfe52fb219c439ea3e765ab66897b59e17693e3af0c5ff1cde6ef739ae05fd",
+            "median_ms": 4.107,
+            "min_ms": 2.582,
+            "max_ms": 14.391
+          },
+          {
+            "wall_ms": 1487.2356000014406,
+            "sha256": "4ecfe52fb219c439ea3e765ab66897b59e17693e3af0c5ff1cde6ef739ae05fd",
+            "median_ms": 2.511,
+            "min_ms": 2.337,
+            "max_ms": 4.726
+          },
+          {
+            "wall_ms": 1626.1917000010726,
+            "sha256": "4ecfe52fb219c439ea3e765ab66897b59e17693e3af0c5ff1cde6ef739ae05fd",
+            "median_ms": 2.691,
+            "min_ms": 2.293,
+            "max_ms": 6.324
+          }
+        ],
+        "candidate": [
+          {
+            "wall_ms": 1316.0724000008486,
+            "sha256": "4ecfe52fb219c439ea3e765ab66897b59e17693e3af0c5ff1cde6ef739ae05fd",
+            "median_ms": 2.267,
+            "min_ms": 2.173,
+            "max_ms": 3.893
+          },
+          {
+            "wall_ms": 1597.2860999991099,
+            "sha256": "4ecfe52fb219c439ea3e765ab66897b59e17693e3af0c5ff1cde6ef739ae05fd",
+            "median_ms": 2.475,
+            "min_ms": 2.148,
+            "max_ms": 11.453
+          },
+          {
+            "wall_ms": 1852.9240999996546,
+            "sha256": "4ecfe52fb219c439ea3e765ab66897b59e17693e3af0c5ff1cde6ef739ae05fd",
+            "median_ms": 2.962,
+            "min_ms": 2.18,
+            "max_ms": 14.231
+          },
+          {
+            "wall_ms": 1338.561699998536,
+            "sha256": "4ecfe52fb219c439ea3e765ab66897b59e17693e3af0c5ff1cde6ef739ae05fd",
+            "median_ms": 2.304,
+            "min_ms": 2.148,
+            "max_ms": 4.435
+          },
+          {
+            "wall_ms": 1921.5886000001774,
+            "sha256": "4ecfe52fb219c439ea3e765ab66897b59e17693e3af0c5ff1cde6ef739ae05fd",
+            "median_ms": 3.291,
+            "min_ms": 2.18,
+            "max_ms": 11.737
+          }
+        ]
+      },
+      "summary": {
+        "baseline": {
+          "median_ms": 2.691,
+          "range_ms": [
+            2.511,
+            4.916
+          ]
+        },
+        "candidate": {
+          "median_ms": 2.475,
+          "range_ms": [
+            2.267,
+            3.291
+          ]
+        }
+      }
+    },
+    "hover_1440": {
+      "args": [
+        "--layout",
+        "Latino",
+        "--size",
+        "1440x540",
+        "--hover",
+        "A"
+      ],
+      "samples": {
+        "baseline": [
+          {
+            "wall_ms": 3310.555600000953,
+            "sha256": "05262348d3db1be4d6212357acd8e0ba467160a402d0073d02bb9812f87d1949",
+            "median_ms": 5.834,
+            "min_ms": 3.367,
+            "max_ms": 22.438
+          },
+          {
+            "wall_ms": 2957.717399998728,
+            "sha256": "05262348d3db1be4d6212357acd8e0ba467160a402d0073d02bb9812f87d1949",
+            "median_ms": 4.853,
+            "min_ms": 3.308,
+            "max_ms": 40.18
+          },
+          {
+            "wall_ms": 2855.721399999311,
+            "sha256": "05262348d3db1be4d6212357acd8e0ba467160a402d0073d02bb9812f87d1949",
+            "median_ms": 5.105,
+            "min_ms": 3.342,
+            "max_ms": 8.832
+          },
+          {
+            "wall_ms": 2520.6130999995366,
+            "sha256": "05262348d3db1be4d6212357acd8e0ba467160a402d0073d02bb9812f87d1949",
+            "median_ms": 4.525,
+            "min_ms": 3.311,
+            "max_ms": 7.676
+          },
+          {
+            "wall_ms": 3195.963899999697,
+            "sha256": "05262348d3db1be4d6212357acd8e0ba467160a402d0073d02bb9812f87d1949",
+            "median_ms": 5.519,
+            "min_ms": 4.02,
+            "max_ms": 21.396
+          }
+        ],
+        "candidate": [
+          {
+            "wall_ms": 2354.2393000006996,
+            "sha256": "05262348d3db1be4d6212357acd8e0ba467160a402d0073d02bb9812f87d1949",
+            "median_ms": 4.262,
+            "min_ms": 3.302,
+            "max_ms": 8.28
+          },
+          {
+            "wall_ms": 3102.5450000015553,
+            "sha256": "05262348d3db1be4d6212357acd8e0ba467160a402d0073d02bb9812f87d1949",
+            "median_ms": 5.564,
+            "min_ms": 3.653,
+            "max_ms": 21.012
+          },
+          {
+            "wall_ms": 2572.9984999998123,
+            "sha256": "05262348d3db1be4d6212357acd8e0ba467160a402d0073d02bb9812f87d1949",
+            "median_ms": 4.701,
+            "min_ms": 3.612,
+            "max_ms": 9.849
+          },
+          {
+            "wall_ms": 2665.0491999989754,
+            "sha256": "05262348d3db1be4d6212357acd8e0ba467160a402d0073d02bb9812f87d1949",
+            "median_ms": 4.511,
+            "min_ms": 3.274,
+            "max_ms": 69.139
+          },
+          {
+            "wall_ms": 3370.6531999996514,
+            "sha256": "05262348d3db1be4d6212357acd8e0ba467160a402d0073d02bb9812f87d1949",
+            "median_ms": 6.174,
+            "min_ms": 3.398,
+            "max_ms": 20.554
+          }
+        ]
+      },
+      "summary": {
+        "baseline": {
+          "median_ms": 5.105,
+          "range_ms": [
+            4.525,
+            5.834
+          ]
+        },
+        "candidate": {
+          "median_ms": 4.701,
+          "range_ms": [
+            4.262,
+            6.174
+          ]
+        }
+      }
+    },
+    "pressed_800": {
+      "args": [
+        "--layout",
+        "Latino",
+        "--size",
+        "800x300",
+        "--pressed",
+        "A"
+      ],
+      "samples": {
+        "baseline": [
+          {
+            "wall_ms": 672.1504999986792,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.106,
+            "min_ms": 0.988,
+            "max_ms": 2.475
+          },
+          {
+            "wall_ms": 705.4758000012953,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.101,
+            "min_ms": 0.999,
+            "max_ms": 2.849
+          },
+          {
+            "wall_ms": 701.5370999997685,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.129,
+            "min_ms": 1.006,
+            "max_ms": 2.486
+          },
+          {
+            "wall_ms": 680.0839999996242,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.047,
+            "min_ms": 0.991,
+            "max_ms": 2.667
+          },
+          {
+            "wall_ms": 692.9259000007733,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.046,
+            "min_ms": 0.996,
+            "max_ms": 2.449
+          }
+        ],
+        "candidate": [
+          {
+            "wall_ms": 689.1075999992609,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.042,
+            "min_ms": 0.973,
+            "max_ms": 2.746
+          },
+          {
+            "wall_ms": 669.1179999997985,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.02,
+            "min_ms": 0.986,
+            "max_ms": 2.682
+          },
+          {
+            "wall_ms": 640.8400000000256,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.025,
+            "min_ms": 0.972,
+            "max_ms": 2.225
+          },
+          {
+            "wall_ms": 651.6384999995353,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.045,
+            "min_ms": 0.984,
+            "max_ms": 2.359
+          },
+          {
+            "wall_ms": 771.1328000004869,
+            "sha256": "95942b4c56cc47da09e72bfd5a3c0454243c48474c1114782a5396247b443237",
+            "median_ms": 1.111,
+            "min_ms": 0.974,
+            "max_ms": 3.217
+          }
+        ]
+      },
+      "summary": {
+        "baseline": {
+          "median_ms": 1.101,
+          "range_ms": [
+            1.046,
+            1.129
+          ]
+        },
+        "candidate": {
+          "median_ms": 1.042,
+          "range_ms": [
+            1.02,
+            1.111
+          ]
+        }
+      }
+    }
+  },
+  "matrix": [
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Windows",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "8d9d9e96b16319f8ace1310f01de7f3be88dc902799b57b55a1734f1876e100b"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Windows",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "819282c13369b116772fe117e519dc51518c691a14fdd18e7a77924c9f393313"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Windows",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "05262348d3db1be4d6212357acd8e0ba467160a402d0073d02bb9812f87d1949"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Windows",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "abda25a645bdaf0dc0d81fb5a8c959b81ac10f9fb1e0823bbb01e45c2652b366"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Windows",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "3bc1b09d894647103c34361cb6c149ab899503d3edcaaab4850249bc71a784b9"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Windows",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "51d71945b649fa8275962f8c256ceae345c0a9722a939e289bf5fea3d093083c"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Default",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "2851f6df0b55a777c3e6f562cdd19ab8703b493f630e75133c0e46a30736c068"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Default",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "d19b67836f4f97116d737a5f99446c4b81416299ec4a5168c7b198c52138e701"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Default",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "c30d7446a3fdad8dd0360c6efe40d5f59fd5fa206d3a12b4068ee98ebe31768f"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Default",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "a5ab698b26a54839ce7086bbc16b7950d517ffe34c8a5d59bfef0ded6c08b95d"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Default",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "677377d7ca0d1e74fd89d0e54d811de457ba409cdce753aebd7ed3157deeb86a"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Default",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "d1f32c935db75118415461e97103b842687e0d06061157183324ec5dfa9658e2"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "8e6a483f668701bfda16a5553caa8f765eedd86e5741ea1f691482ac670db2c1"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "433a49e3eaf797479bab4b7da89c652bd085864a3822428c45068b2d98b65292"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "fe9daabf87094d26e11493e78a6ed6290a2ccac4eba092490acf87e8610f5ee8"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "880f94d1708cf2c482d7721dee705871c6a70b1219c1dc5897227b79b45bed1c"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "98c7c6a35134201346b5f518c3201a3bef5ffc5895aa0451328719fd9b9bcd8a"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "e37550660f38d1bedf4dfb81d947af7db9ef26c67766b503002ae6bcd1b7e442"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "cefed4d3db74616652b25942b6bb964684a4548305ba021b70f955c0cefc41a9"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "80baf584ae0c64c807b376225240d8c8c0f7de3a297a801c7e9f9dca47034ada"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "0e213bf8f3fb111584cf79aff5781b248d7ca96772fd24eb4cde7a325b02952f"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "75d7fefd763f64cf6a0d637f28316a9701d048107db1069d719d3a554bef24bf"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "0110230372c27e28d21eb598aaf20904a51af0ad8c4fde50c425f6eb98bdf391"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "66f7bb6e6a7d2b92953496d7f164e0b4736165f81a04e61fcb5135500ba09cb2"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Nord",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "ed7e4a5865bd13d5a7fc53e2ccc535b364e9851577c85ee5969aeb9ecb18ce00"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Nord",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "b8f351f3e9010c5cb4bd0e3a57c4ff012a52c1bc9838e5c4d9f7ace1c61e1562"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Nord",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "5e8cf4d344261bc83dbd5032efe96e8c3f94d8388f65a9edef823ef57ea73932"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Nord",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "15abc2b237f52faef18b96c51738268dd7acf6c9479000c4633eaeb45cb84570"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Nord",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "74442d04dc721d1bf52e591d83827f712528e9ad55df7eb5eb70bf6f292e803c"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Nord",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "1bb59bb5825259e6fe235c1b06cc796f54a068cfe5323ce38393e2cec91e302f"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "64b070142e2517f61edb156739b16d772ea21fa35d13a0350675ec1d003d7545"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "b203a488e21e3fdee336360c1813a9bb3498b3b1f3222ee30ee549491987e6b8"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "40746a3dfa5abcc7b1604ac8544277010b2c98b16c7060c7c7a7accf0d172f2c"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "59e3d6bbd30b61b6b90e3fa03984d74520cd873d830f3f4a4365570958fc9850"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "062db79aedbdb25db41ac408ffac0f31f69076baa5e4c43f8d22f522dba5f5e1"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "6304ad12cc16b6e3cb69dda45329118c5eb8d64c4109a56f366d687961964978"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "5c04f0b9b18e244d64a48e7f7765616a29cf92bd57dbb252fad59d59d414c658"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "c3d8992b03577d40cf2d28be0135f64d289663d79583b5b408d9821ab6df9e56"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "0d95aa1c7e5e005d78e37b7076fddb668fae16bd62a1a714839e8e401c412a72"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "5742793b0198cb2589e139f35704aecb54671cebdec2948af6e9490d5209764e"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "335321c70aec25a3da704eee8a6db90b5447b839915f8d26bf87a92235a71e84"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "5acd6b73a5670d5cf3347c6b18c65331b0cdcc5f50884b4d25a959f860bca16d"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Dracula",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "16b7e007017814e55c9bf9e14a640e757eaaf20f39ec7fdbd00e3b284f2ceaee"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Dracula",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "e93f2472ebb73ec80c35b2b166d323b4aad3d40943988fe3a9f4cd07365a45da"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Dracula",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "bdfb0c41b719f9fe99987a6dcfaf4aa59d2f585174956f9e4d09378eff4bb853"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Dracula",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "71b47ab84e1a83dbe0973190edae62e6a071a87f3205011ac22af9e1b35eafb9"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Dracula",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "ae49b847c09a66d7d4b573b12e5ce73835a2d6b6d1f5c13d0463dd0bee365f5f"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Dracula",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "707c7d3ed557861344e93bda003ebb8b0920c54d901c17f4dfda36a953b023b0"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Everforest",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "b9e54e0f3146e0cc08e3980c5713079795c775db07b25414e43c018c7baa77a3"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Everforest",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "8bee73985d2f26aec1ba31121bd60d2f32fb0b2b22b8a96ea7a88f13b0cf1972"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Everforest",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "ade90aad3dc2b96a748adfe2bf5701a4fcce741ffd3a0c2e88ea3ba92e405631"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Everforest",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "84804cd7fa42088a365a5f268e0705b95c8e1fb19f04152463bdb86c1f4aa6b5"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Everforest",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "c1213aa92c9275c1cded20fc310fd6837492c841e3f1c6df5c70d70ed136c827"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Everforest",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "32328593f6c045383f508b63ec4275579dda277e2a74bb6c13418c5ec5e2485a"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "e0594ed7fc8672163cc7f3c038ffe03d26d941999b6db0e788b1617d28be1eb4"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "b1a5524030404f7fc7c0bb305de16ab94e08a9d4a60f6a117274541fd471f4ba"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "4225ab8d177849d7b3af8a301b7e53a1a87b5966fa5b1792a8c21f60a5ecfc8f"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "b6905749678997a6232b73be964bbca6381b40347f901ce50b2aa25ea521a480"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "fb147fbc16727aee4c88cea064ab779a94c1982c664619eeb22785bc43ad53a7"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "fa4621635dd7b271eb4c0073e7fa912da00473f1cbb06883fed25da40e7b7ba4"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Solarized",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "66d38ce0d878ba9bfd9250300f3d14b31ae2d00d7604efa6f13432f6a8826ad5"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Solarized",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "fe0a2526cf476896006ab2cf283cbd10ac30cb363e4b7926f2c56e4fd380fc53"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Solarized",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "4cfb6b7e83c4717596a5fd642669b5f835ea102cb247778dd50db126bcfdf8b6"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Solarized",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "9964a50472f2bacad2a03a358a4bcd59fe56b46c5ace66134638f98ddcc8c026"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Solarized",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "5fe5a519215dbc0c3c8c788031a45701f9b96b3f981b93f21ffa8e80b6231d39"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Solarized",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "9f745673ee5473ad0776dc731df74595d20e0e72e4f1d659d7434542a696ac68"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "2cd98bc71157f9161aa9e76d038530a2dd3cf240d47784ebe24ee133e0e8a5cc"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "ab07372b113daeece92af6aa9ef33b2a1731041db8a365a0fc9f488b6bafd1b9"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "d5947021cfc70f1bb1f09ea49d33b8398551fc32b23ee97d27e95ef4746fe366"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "bdbddd6b1356ca01d3dfe9b0ec85bdf594ecbdb6589c184c779bb7c7266dbd0d"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "1a13a1fcc2ad9fef951efb382ad9ef905a5a382eea75ae4fbbd9c228d634edf2"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "dfcf2698f04aeed9f67006ab8fe137821e5fa782ce6d94aadaed9b753db52d61"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Abyss",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "33f473822c11fcca8f2fd4df876e7f3735893b65118d829345c7bfb5c1f8bf3d"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Abyss",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "5652aa46cfdfb664f6dd670462f3a582c5d35669e476559af5b1c57fc905ee2c"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Abyss",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "70d327dceebbb5576ee2e95373b44123e3cdd934c2539e353c357d496fa4b7dd"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Abyss",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "bb71ab40121e2965df2f8619471d384f60b3a11fc68ad870d76bda025652f696"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Abyss",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "39729dce0f13ab5497b0cdbd2b2261b5b3b81d0b01a48d49ad8344af05ba3371"
+    },
+    {
+      "args": [
+        "--layout",
+        "Latino",
+        "--theme",
+        "Abyss",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "cc8c2691fa70dc8afaa8ef8652411809088374191cd00ac13aa3f10a1580f7b7"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Windows",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "c328698daeeb07c7a8b8baaee28fe61fc34f68118795ee57385ef55d86740c1c"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Windows",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "4d12dbd34a598acbc058b4f4a6b3d354b73b75b8dec66b66c096f5f9cce83aa5"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Windows",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "209df5e1663cf56f86433ef580b460be11f69365087a10a82d5fd4e47fc754ac"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Windows",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "aa7c3b7dc8d040300a982dbe98c00ba53706ec1316268418c749f464a05cb7bb"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Windows",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "10b144ca89bc4ee3c0bf1665a9789c711d73ac8fb4b5200e45552d91cd064dce"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Windows",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "5862b4e42d9f3860949f978f83c546df8d8dc38b62cf5018aa14b8cdb2cd6719"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Default",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "e5fb0bb4f88a47133d96f3cd95fc02a79b1deb17bc224ea9fd5f465b0a00b997"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Default",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "59bd665b3869d16f539c5252d9c2eb1e7eaa0c3fe7b5019c56ff41532a3ad5ad"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Default",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "1b4941e58b3acfa532ffd8fcdd0dde34c108813a5edaa6db47aead039ecb83f7"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Default",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "b0b13d2411d6787a057fb4ca0ad030b1c2957c9d0077e465433853190550113e"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Default",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "2d185ddb3066bdec9ebef5646def25b12da79c0a3ab0614af3cc8e330ef105a5"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Default",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "a7ed09e56d477d3419b418b12edd34f94ce357ea1de76c4d91144a65c589e630"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "b58deb9e08da207c6ea992e35c58ce47ea7bcc166b4f7d9771684112cf115a8c"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "bf945812f802ee3f454a8e0e0ef00a9c06cf59341ce3b1da29a57da0d1b66e5b"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "a57c04187f9d23bc08765e3668bdfd91d5e85db952691490e416290433b1e903"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "2266b9ce3ee09112953176e475d188bf1b917f34620e7aa3e158d1d0f2eaa221"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "f7dad20543c857c8fb8525653ab3e27db0fa7838133110d15da2ade166198f36"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "26f5abadac83270b7b005d90b24086abdb73ddfd093774fa201bcb2304446ad0"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "654cb113b074fbb40602eff8b2f926116447d6f1a58b07d17d48e04096b11d23"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "1c6363cf8432258210f6c4d5fbf479ca5483237427a0afb916a2c92e3fab885e"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "2a3993c037d2a42452f309c123813b1cc1a85a3de88aa2cf3a0932d7223899a5"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "ae6182eb0b1c989f465a53ca14301416823301548071f4770f72e35a06959229"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "3dc2a59fc111b25da75c3e2d7bb3a22ba8ce5289d39b78473ac3c7cfc416acbf"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "bff575c4003f097be68db9b7150f06976699642a764a47e685fc29b8d6268780"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Nord",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "5354f2c84152b00c941736d9ea3a5e2956391dbfababfca9278c52ea2838c816"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Nord",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "4ff2b34c3e8dd9029edc3dfbeb9b2554bfb285248f93e00bca0140d5b41a5955"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Nord",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "ac13733d7508fe7b961e4ead23df86cd0388bc40546754d0a8bbd331491fbb69"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Nord",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "08073f6cfe0c4892af5dc1d7960d8ebfd9fb49fafbe03c4917d2e03ce27fc7a4"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Nord",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "c8b58a4bab1ae53e8c5f0f9201802d9a023cde6f3020f3d39c7adab5ae51f619"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Nord",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "89513034f49fb426c7ce560b2569ee86e490470b6f564c5c28fccc81509f72b2"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "2880f7a13ba88e3a873bccc9b3bfed374128655ce3f161e4611b097e2218fcbc"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "558a687c919f189fd463cf2692996493de841c9f4a8c95afa511691a1c9efe61"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "fa1ddaeeae4ae45baa76c60d66e8063e23849700d9d82aa03b95e9159ed528dc"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "67dc4047fa48480c170d7d28f106cf9fb80ca88c9096b766da92d4dbd8774a5c"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "3fe928e1857ee2a5054ea395445d00849bc7b1c6ecbb3735e16291e24452f604"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "b564c3eefd6027dada4d8954b56896d2b046df86e72fcd993ca3dc20a9217e9a"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "d635e7302abcb68abf087570f70aa6bca1797ecd9b00f2741affea722a65a49e"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "26403853e9b21c7df333200fab58739e786f428441c2ac5a2da0425e60929e36"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "b3b1a0c7749f366c2b4139cc64ae41bdb5b8517744ab4a0d83e5419109b94212"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "9992667fb06aca50ff9f23731acebb55747c4b089a153c2b1911f09c1319bc5e"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "3d9f362c9aae73482974a93607dca785711731693a62363094fc4dd9700d12db"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "cf2b99a69901589535a4b86fd54778798efc76217d427b47c07c4e97a55e8eef"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Dracula",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "545584cca317eb57f76ff9e1aac1a2ef7415c18b74d9296412d76189576d76de"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Dracula",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "d7521cfa805b9fe66d03d09681737cd18bc10a2ebe43fa01b113fe71c7c98aa6"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Dracula",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "8a239f1f0f6f538cf7ce1ec02b068e0d195a20ca77ff11e146ab0c00ce46e9eb"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Dracula",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "4907aab54490e572009ce062d9efbd9fab973daa15e16b3dfd08d164f936f8b1"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Dracula",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "1aac2b58c9eba22524119a2f4ed75a2f075ef4d1061369b6d3cf2c4d984b75aa"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Dracula",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "f5c634fad55c56096f100be3739d61fe2c3538e4b755921a1be330edfd0c5de0"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Everforest",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "eb6d9de357a93cdc9880c18eef250f01d6c68180ee3c6b77dc55ab30b9254c2f"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Everforest",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "6b4a682e85d80865392021137d1334bf7630baf8f8efea504650b3fdab2bdc5a"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Everforest",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "219a2e100077865a5de82d8ca7904c88902edcb6cae2a5f93c3a0a057fdeaa1c"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Everforest",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "8f563824bedc2de8cb4e67177ac5032465e0e06fa81328d5aea7a8402fa68abb"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Everforest",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "37b1dfcd15379181fbe6c2fa1355966f7ffa503dff038ae111da741e4f604081"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Everforest",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "ac2350fb66ab728830de622939396f153556965a5f1e140e998a7a08c4dbc0d5"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "1a233d5506c29cff9ac3cae63c161bb930f87d0df9ac785af55456cb7eef3c2c"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "f6eac5d435d983cb201498d1e37b03713c358c96da6b3f66e19f8c6c308f21d8"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "ca2db0089fde2e39552264821d8f431056c247a2f15cfe3c0e97144615e9951d"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "562a105a00a9f3f220d4b130c0232faaad17bbf21ee84bbef8112b31811e8e0a"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "cdde4363d8d182bb458ecd84adf991b2ceae07ed509b41dfaccf60ef5c89a915"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "2d16c379eb71e68ef6e73de48e79fd369d7f12f174625aba2627a123dd74caaa"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Solarized",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "f3071ed8fb282a8f1f74ffc3b463bc6e4a5bafc65016f28776dbe4cecfe80083"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Solarized",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "ed3e24ad07ff307c01561d5776f965ade1e93ff712784cc1ace0ff57870de780"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Solarized",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "25483ddce7d746df40760f34c4367471da409095747d83b8d003bb18c0c4f815"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Solarized",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "031de8a37c76f227a1dd8da2ecdc40999b8a6e06ebf39ac1f15725ac663dc0ce"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Solarized",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "f1098892b2bd701f21902edf7dbd16ee720185e7e8476e208fc81550b59a7d9c"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Solarized",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "25b18fda15980d003af3172774b623d415975e0c7117301688f466817525261c"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "b8cdbfcfff0183fb650df4726422b0c794c0b44d01ce6e42a7d0bb17452fefbf"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "5d05744fc7b3f83d07770b3b57338412c6a0e410bcaee8bc8665965763fa7cea"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "018fd5185fb2822bdc5c1696879b124d19145e0e328b1847b5688693a61f5141"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "497acdc7404205c8e0acf1a4c2eef4e11b14c0cd58c9b71682cb495d239bdaa9"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "b540042b63ff8f592e827c80da0377e05460e4efd955aa56ff6b1f0acac1c9f5"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "1f2f547559b8c16db782870bf98bf2f34ed3d29e4ec8dfc0a07b28e740566b49"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Abyss",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "ceabc4209f32666c273f2444790f54d139193742e0df6c667ed49d655af60ed6"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Abyss",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "2a13dbcdc723128a3095d4e7e976457061d29c28ec64d0b00b08f7e59d019b04"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Abyss",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "1e975c99b2f3a1c8ec6e27c2a27533a020e10b21d7962a34e7e8dbf153d00ddd"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Abyss",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "31b5d684870907898bd3ba8605479a5651b26a906eac6a622843ca8864018f2a"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Abyss",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "d01d18c715125cf3997263f03ed4ecc7caef2272c574aa84818616cd2bd5c88f"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%",
+        "--theme",
+        "Abyss",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "05b6592bb523137c91998d8c6c72e4e96786207722246a22908dcc78b83a976c"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Windows",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "1d672080cc16ca1100fecf4b0c20d5794dac244a13d518f74b5f2808b45fec91"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Windows",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "abb926ca9cda54ad0a0a4a37358278b7f9fc4a21c38fccd8990911b3d6960783"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Windows",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "2a3c58de6fe9159920706e11c4c771de90b0990ed93a46ec8c58abad64f19dfc"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Windows",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "f3338ec691705d4d2fbc4ca9c4008473790c94bfb705b3c8044a2024738e3669"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Windows",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "755da02bb6313805d2a6fbf49c549fdab67a35c4347fded9f4df533b7cb257ef"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Windows",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "157317d03d1e5cb2e956403f76603a54085d4e78048ccc40a1de94ae17d19783"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Default",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "30e0627c23c8ff0718e09d945d2b5c61cf1b4896bfdcf357c5b9f6332c93d43b"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Default",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "5a3bf121321ba857e6c3f87985fd15b694cb3a317eb2e32d4499f74fed47097b"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Default",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "c54349a9fd7bd2312a4884576ede69563c918c19dcc6311330b73bc2d078c077"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Default",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "660ef83b35a3803c12614cfbba021ff1cb9a219562e18bd79441ffac548448c0"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Default",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "78142577995a6b7f36da3b28e557532277ce87d43cdd2237b9e98bbb2e453652"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Default",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "bcda94538e613628b4a902997e401b12c6e5148b7aa1a2874fcb60a504e68e9d"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "319f0dad44e460db3e121c773d1babb12f529ebbf4e1564c6c22d88527b5635d"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "cd4836ff9aa48d1f7bf6ef7984009034a5a558269f7294fe522412f0614c036a"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "e7b97c3869b9d274c28b525830a9e29edd2ababe6ae6d494365549ef7beefe4a"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "820c1812276033faa34a9de6def2e0574bc7b46ab4ea8c122b41af8adfa0274c"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "f49e1b04482d44ea2c7df75c54acf6c683021e3d8ff745a402c34825398447ec"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Tokyo",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "5e161093ad4059c2d9f42cd0e6667384ff0be753f9caf788161899397b59b5e8"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "fbfb67ee3f2f608546a4438e7a361b5ed39b3a3e057b2805a5de126e82e19d5f"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "f8bda2a7e366c5317bc438b1879238eabdca02e7cad7a2c958a2b337ac19902c"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "4c78d1e3b8286ee3e1b52ac5df889fd4bd1c23b16172ab965329d619bb21975d"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "22fbea7a8ed0e6c96c52395aa30f7fabb86db1f20b9f228c8f9e1ee084d96b52"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "0c945b34dbd21037343cb6e550fdc60d501e629fd3acc5845fb2209f4d2028af"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Catppuccin",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "eccf189c8b7584b4f612118ceee28ed6e7f7c8a1ce92043c2315e416108eed31"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Nord",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "36c52c8b613ec93cc231a17abc5255e3c0a29bae696f53b026296e23c6d8736f"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Nord",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "2fa61910829b148f857ea3184c17eb09493315ca17d7b287d759e33e84fde1a7"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Nord",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "62ba42964015c33f4972667e3be6a3245be75377d1a9337069874fa40ceb0c78"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Nord",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "4c526287baedf4a34588baa79bbe5ddeab7a3c9f790a25a186764b290139c947"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Nord",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "4294ba78357762807d6efda866db699fcd0573ea3fa51944d8d8521586a8fd0e"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Nord",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "82c786177eabc19726ea237bea5a91da24f41070b6febd43f26d3da3ae88c282"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "7fbf3c19eb3eb3ef5728b78c030fb766bf65a941b4e15a052196f10ff8d7220b"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "b70409caa02bc3e8edce987ab7a25f39742e51532da46d82a5a9f5a61e1b5479"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "16c0510e62f187d2fc09192d1fbb8b502d82ea16b0eb6663523b3ed29aed51aa"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "e2183037a8a76b6789da5bf55e7d4f84c6605e235d385be0c8ca26dcd252ccc6"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "748e5dfc361703964861b8616ac41d0e643e837688bbc8b9184e6c7cb04139e2"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Gruvbox",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "fc7cafc5a28504e56051cf83b774369302149bc3643e8a40fb05e401748f319a"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "a3b5ced411a431a6673c3a4f6b25d1ebe6f9dfe10725c462ce28ba891f06eaaf"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "75ee0dd99eeee20490f047d2f75e1abf12327e8b09dd37c359c7c1f5408a5cf8"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "ad7ae4326ebe7f38a6825ee20dd8a5d4362c297bad29da6e68b8f1aada79244c"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "995e57966fa6c051bdc74b370e2c998ebf5f14284a005edaf23a0e7ab2c9b771"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "59a2ea7b4408db19898721ce45784d1cb7a083468d2d4adc9f70f8386a25f7a9"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Rose Pine",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "1c46b797f227e861dc00311c3a40aac45cb133920a4c1bed073dec1f9b9c330a"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Dracula",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "fd287180a26391fed72d37ad64a2357e531f98c4f52b9c8c93cbbfdab71a0389"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Dracula",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "a9c45bd19ef137abac974c1e23330a07ae8902fa4c65841d1e6b8bbd4c33ae87"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Dracula",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "caa732ab6e3c1a3f3ff849baec12c761a2425dd89694d0b26be25f9b6e0f2dfd"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Dracula",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "92cdbcb1dc92306c44def5af437b5adde2cca3b71a3b8d54d6e8984d32afe09f"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Dracula",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "5999a7ec2aded88cb0a387984a646257f89a80a3f29fbde24749361b5e97dd41"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Dracula",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "ac19f2c57a467efc3d4847a115d501051f7c90efa232ca65d0a1b2ff414d137f"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Everforest",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "5b74236db0cde36535bfb4da4b5f99741b3ebc73cecece999c80f240c02ffa04"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Everforest",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "fba014f10e2e16950907cbc1d20fe8fcef9116a3c599107afe0081cb0ea4c310"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Everforest",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "ab2037d316aca552e3a82de3606cd65e418b4e99e4e1f8bf4f001b60355679b9"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Everforest",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "ab09b1cd24cf55840064575ee039c2775b5a5e45e023663a65be5e888adb7073"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Everforest",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "2b7379501e07e88473e1313ad7c7ac4c11b9804dd036699778ca5b4023eb9fa7"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Everforest",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "61f311c050d550bb546287a992b85710c09ac6d30f4fdd8aacf62bc296cdb24d"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "956a8ab5a99e3206caf9398e97d543c0d2b0214cca29f4d965e3577a8d46f4d4"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "ce5e2e9cbd6d785871f3f60a64ba2b3b1a961de96acdb1284e66b2ed36543e1d"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "7f0c2030e6889e9b3a80f32f608f5bf04117b776ab91059e9de28336b3106fc5"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "4ab77adfa5a7dfe44fd9f4140389f4df29f4ccadeb6df232eef5d81e08fb8bf2"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "bc8728b78265520c509b4a895cb528e0976fe1ea996efedfb01e85cbd7e52f5f"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Kanagawa",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "0a76be45ca30e582629bfb896a17878cfb724dee6d8af907d95be6d3b5e07044"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Solarized",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "f3a9bcdf295c5440bb640150541ca98285bb8ddcd49419b1fd475783eb065c41"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Solarized",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "fa003007b94e8a2b0e9c662b5937df0939dc198b008eb28b6f97afcfdc768efc"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Solarized",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "4703124ce994a5316ed1cce9631bf4b1438925c9ab85fd5b1ace4144032016c3"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Solarized",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "24e76dfe99f5dc93bb4c8c46e0c09e06115d5bbfdc3663c000506be865120afe"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Solarized",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "5c768620223d9a5f5c6de9589759171d824c8f36cf99271352598c220d2375d7"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Solarized",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "4d48d00503b664bc37c68072b7b939b92ba686726e5794f7b30cacd478767644"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "9a02e5aa250f6d0a180c4b04db405e2f36d7fd5a6e516df8b5dd84cd4bfb5fe0"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "2c6835bb0f48f801e970d84e798382191d5a3d40dc030ae7c205e69c5e0b29cc"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "a0174bf0b685e904800442c46118e177603fbb4f2ba81544513d2aacea994a81"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "894c4021c05d2f96152164cd09c9cf00d3fb4d7a9fb4f8c7d0f701c996810597"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "b48dd3d0a8274f7f9ac542dfa764dada770cee39a6b7eedfc7c797fd7a6038c1"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Cyberpunk",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "23b05a1a826e0f648c029631a61306846e1787de19f7202785775702c24d87dc"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Abyss",
+        "--size",
+        "800x300"
+      ],
+      "sha256": "6a7f373da28beda5c3f87585080037b601cb360501ade9c74c296199d077716f"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Abyss",
+        "--size",
+        "200x180",
+        "--hover",
+        "A"
+      ],
+      "sha256": "3a3df113bc6eae4be6ed16f2b10ce1cbff666d2e4831b984e9904b284a1adc93"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Abyss",
+        "--size",
+        "1440x540",
+        "--pressed",
+        "A"
+      ],
+      "sha256": "4928170608c45a36165fccccd355284ba8a550933a2239d805d8450462ba815c"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Abyss",
+        "--size",
+        "400x700",
+        "--menu"
+      ],
+      "sha256": "3f75a84afbba4b7b51cb9f67ba2ace513e0df6dc955422181e70d3b9ebd7aa66"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Abyss",
+        "--size",
+        "721x341",
+        "--mods",
+        "shift=latched,ctrl=locked,caps"
+      ],
+      "sha256": "24a102f91b9005715c0c96c8f3ef9d5263fa458bed3bf8dc7e4d281e1f78c0ec"
+    },
+    {
+      "args": [
+        "--layout",
+        "65%+Num",
+        "--theme",
+        "Abyss",
+        "--size",
+        "801x301",
+        "--hover",
+        "handle",
+        "--anim",
+        "0.5"
+      ],
+      "sha256": "d2e23bff2c88d9d2c20939400802c94ba56196e57094d0bab65e67cefbb1da80"
+    }
+  ]
+}

@@ -593,7 +593,7 @@ impl State {
             #[cfg(feature = "dictation")]
             dict_state: self.dict_state,
             #[cfg(feature = "dictation")]
-            levels: self.wave_levels(),
+            levels: Vec::new(),
         }
     }
 
@@ -666,7 +666,10 @@ impl State {
         let cr = Context::new(surface).ok()?;
         // Out of self while the view borrows it.
         let mut cache = self.key_cache.take();
-        self.view().paint(&cr, &bar, &mut cache);
+        let view = self.view();
+        #[cfg(feature = "dictation")]
+        let view = View { levels: self.wave_levels(), ..view };
+        view.paint(&cr, &bar, &mut cache);
         self.key_cache = cache;
         Some(bar)
     }
@@ -1059,6 +1062,7 @@ impl State {
                 self.request_redraw();
                 std::thread::spawn(move || {
                     let pcm = crate::dictate::resample_to_16k(&raw, rate as usize);
+                    drop(raw);
                     let _ = tx.send(crate::dictate::transcribe(&pcm));
                 });
             }
@@ -1158,7 +1162,10 @@ impl State {
     /// due, so an idle keyboard arms no timer.
     fn next_wake(&self) -> Option<u64> {
         let now = now_ms();
-        let mut due: Vec<u64> = Vec::new();
+        let mut due = None;
+        let mut consider = |deadline| {
+            due = Some(due.map_or(deadline, |previous: u64| previous.min(deadline)));
+        };
         if let Interaction::Press {
             press_time,
             hold_fired,
@@ -1166,26 +1173,30 @@ impl State {
             ..
         } = self.interaction
         {
-            due.extend(rep_next);
+            if let Some(next) = rep_next {
+                consider(next);
+            }
             if !hold_fired {
-                due.push(press_time + interaction::HOLD_MS);
+                consider(press_time + interaction::HOLD_MS);
             }
         }
         if self.flash_key >= 0 {
-            due.push(self.flash_until);
+            consider(self.flash_until);
         }
-        due.extend(self.ctl.tick_due());
+        if let Some(next) = self.ctl.tick_due() {
+            consider(next);
+        }
         if self.handle_anim_active() {
-            due.push(now + ANIM_FRAME_MS);
+            consider(now + ANIM_FRAME_MS);
         }
         #[cfg(feature = "dictation")]
         match self.dict_state {
-            DictState::Recording => due.push(self.dict_frame_due),
+            DictState::Recording => consider(self.dict_frame_due),
             // Poll for the result while a transcription runs.
-            DictState::Transcribing => due.push(now + 50),
+            DictState::Transcribing => consider(now + 50),
             DictState::Idle => {}
         }
-        due.into_iter().min().map(|d| d.saturating_sub(now).max(1))
+        due.map(|d| d.saturating_sub(now).max(1))
     }
 
     /// Arm the timer for the next deadline, or stop it.
@@ -1824,3 +1835,4 @@ mod tests {
         assert_eq!((loaded.theme.as_str(), loaded.layout.as_str()), ("Nord", "65%+Num"));
     }
 }
+

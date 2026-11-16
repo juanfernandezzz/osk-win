@@ -7,6 +7,7 @@
 //! GDI DIB section and blitted to the window device context.
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::ffi::c_void;
 use std::io::Write;
@@ -72,6 +73,43 @@ static EMBEDDED_FONT: &[u8] = include_bytes!("../assets/AdwaitaSans-Regular.ttf"
 static FONT: LazyLock<Font> = LazyLock::new(|| {
     Font::from_bytes(EMBEDDED_FONT, FontSettings::default()).expect("invalid embedded font")
 });
+
+// One UI thread, one bounded cache. Color and simulated bold are applied after
+// rasterization; the exact pixel-size bits and character identify the bitmap.
+const GLYPH_CACHE_BYTES: usize = 64 * 1024;
+const GLYPH_CACHE_ENTRIES: usize = 256;
+
+#[derive(Default)]
+struct GlyphCache {
+    glyphs: HashMap<(char, u32), (fontdue::Metrics, Vec<u8>)>,
+    bytes: usize,
+}
+
+impl GlyphCache {
+    fn with_glyph<R>(&mut self, ch: char, size: f32, draw: impl FnOnce(&fontdue::Metrics, &[u8]) -> R) -> R {
+        let key = (ch, size.to_bits());
+        if let Some((metrics, bitmap)) = self.glyphs.get(&key) {
+            return draw(metrics, bitmap);
+        }
+        let (metrics, bitmap) = FONT.rasterize(ch, size);
+        let result = draw(&metrics, &bitmap);
+        // Oversized glyphs are drawn once without being retained. Resizing can
+        // produce arbitrarily many sizes, so cap bytes and entry metadata.
+        if bitmap.len() <= GLYPH_CACHE_BYTES {
+            if self.bytes + bitmap.len() > GLYPH_CACHE_BYTES || self.glyphs.len() == GLYPH_CACHE_ENTRIES {
+                self.glyphs.clear();
+                self.bytes = 0;
+            }
+            self.bytes += bitmap.len();
+            self.glyphs.insert(key, (metrics, bitmap));
+        }
+        result
+    }
+}
+
+thread_local! {
+    static GLYPHS: RefCell<GlyphCache> = RefCell::new(GlyphCache::default());
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Error;
@@ -144,6 +182,9 @@ struct Surface {
 
 impl Drop for Surface {
     fn drop(&mut self) {
+        if self.dc.is_null() {
+            return;
+        }
         unsafe {
             SelectObject(self.dc, self.old_bitmap);
             DeleteObject(self.bitmap);
@@ -156,9 +197,25 @@ impl Drop for Surface {
 pub struct ImageSurface(Rc<Surface>);
 
 impl ImageSurface {
-    pub fn create(_format: Format, w: i32, h: i32) -> Result<Self, Error> {
+    /// A pixel-only surface: cached layers never need a GDI presentation buffer.
+    pub fn create_offscreen(_format: Format, w: i32, h: i32) -> Result<Self, Error> {
         let (w, h) = (w.max(1), h.max(1));
         let pixmap = Pixmap::new(w as u32, h as u32).ok_or(Error)?;
+        Ok(Self(Rc::new(Surface {
+            pixmap: RefCell::new(pixmap),
+            dc: ptr::null_mut(),
+            bitmap: ptr::null_mut(),
+            old_bitmap: ptr::null_mut(),
+            pixels: ptr::null_mut(),
+            w,
+            h,
+        })))
+    }
+
+    pub fn create(format: Format, w: i32, h: i32) -> Result<Self, Error> {
+        let mut surface = Self::create_offscreen(format, w, h)?;
+        let s = Rc::get_mut(&mut surface.0).ok_or(Error)?;
+        let (w, h) = (s.w, s.h);
 
         let info = BitmapInfoHeader {
             size: std::mem::size_of::<BitmapInfoHeader>() as u32,
@@ -187,15 +244,11 @@ impl ImageSurface {
         }
         let old_bitmap = unsafe { SelectObject(dc, bitmap) };
 
-        Ok(Self(Rc::new(Surface {
-            pixmap: RefCell::new(pixmap),
-            dc,
-            bitmap,
-            old_bitmap,
-            pixels: pixels as *mut u8,
-            w,
-            h,
-        })))
+        s.dc = dc;
+        s.bitmap = bitmap;
+        s.old_bitmap = old_bitmap;
+        s.pixels = pixels as *mut u8;
+        Ok(surface)
     }
 
     pub fn width(&self) -> i32 {
@@ -207,6 +260,9 @@ impl ImageSurface {
     }
 
     pub fn flush(&self) {
+        if self.0.pixels.is_null() {
+            return;
+        }
         let pm = self.0.pixmap.borrow();
         let src = pm.data();
         let dst = unsafe {
@@ -585,67 +641,124 @@ impl Context {
         let base_b = color.blue();
         let base_a = color.alpha();
 
-        for ch in s.chars() {
-            let (metrics, bitmap) = FONT.rasterize(ch, px_size);
-            let gx = (base_x + metrics.xmin as f32).round() as i32;
-            let gy = (base_y - (metrics.ymin + metrics.height as i32) as f32).round() as i32;
+        GLYPHS.with(|cache| {
+            let mut cache = cache.borrow_mut();
+            for ch in s.chars() {
+                cache.with_glyph(ch, px_size, |metrics, bitmap| {
+                    let gx = (base_x + metrics.xmin as f32).round() as i32;
+                    let gy = (base_y - (metrics.ymin + metrics.height as i32) as f32).round() as i32;
 
-            let gw = metrics.width as i32;
-            let gh = metrics.height as i32;
+                    let gw = metrics.width as i32;
+                    let gh = metrics.height as i32;
 
-            let passes = if st.g.bold { 2 } else { 1 };
-            for pass in 0..passes {
-                let offset_x = if pass == 1 { 1 } else { 0 };
-                for ly in 0..gh {
-                    let py = gy + ly;
-                    if py < 0 || py >= ph {
-                        continue;
-                    }
-                    for lx in 0..gw {
-                        let px = gx + lx + offset_x;
-                        if px < 0 || px >= pw {
-                            continue;
-                        }
-                        let cov = bitmap[(ly * gw + lx) as usize];
-                        if cov == 0 {
-                            continue;
-                        }
-                        let mut alpha_f = (cov as f32 / 255.0) * base_a;
-                        if let Some(ref mask) = st.g.clip_mask {
-                            let mask_cov = mask.data()[(py * pw + px) as usize];
-                            if mask_cov == 0 {
+                    let passes = if st.g.bold { 2 } else { 1 };
+                    for pass in 0..passes {
+                        let offset_x = if pass == 1 { 1 } else { 0 };
+                        for ly in 0..gh {
+                            let py = gy + ly;
+                            if py < 0 || py >= ph {
                                 continue;
                             }
-                            alpha_f *= mask_cov as f32 / 255.0;
+                            for lx in 0..gw {
+                                let px = gx + lx + offset_x;
+                                if px < 0 || px >= pw {
+                                    continue;
+                                }
+                                let cov = bitmap[(ly * gw + lx) as usize];
+                                if cov == 0 {
+                                    continue;
+                                }
+                                let mut alpha_f = (cov as f32 / 255.0) * base_a;
+                                if let Some(ref mask) = st.g.clip_mask {
+                                    let mask_cov = mask.data()[(py * pw + px) as usize];
+                                    if mask_cov == 0 {
+                                        continue;
+                                    }
+                                    alpha_f *= mask_cov as f32 / 255.0;
+                                }
+
+                                let p_idx = ((py * pw + px) * 4) as usize;
+                                let data = pm.data_mut();
+                                let dst_r = data[p_idx] as f32 / 255.0;
+                                let dst_g = data[p_idx + 1] as f32 / 255.0;
+                                let dst_b = data[p_idx + 2] as f32 / 255.0;
+                                let dst_a = data[p_idx + 3] as f32 / 255.0;
+
+                                let src_r = base_r * alpha_f;
+                                let src_g = base_g * alpha_f;
+                                let src_b = base_b * alpha_f;
+                                let src_a = alpha_f;
+
+                                let inv_a = 1.0 - src_a;
+                                let out_r = ((src_r + dst_r * inv_a).clamp(0.0, 1.0) * 255.0).round() as u8;
+                                let out_g = ((src_g + dst_g * inv_a).clamp(0.0, 1.0) * 255.0).round() as u8;
+                                let out_b = ((src_b + dst_b * inv_a).clamp(0.0, 1.0) * 255.0).round() as u8;
+                                let out_a = ((src_a + dst_a * inv_a).clamp(0.0, 1.0) * 255.0).round() as u8;
+
+                                data[p_idx] = out_r;
+                                data[p_idx + 1] = out_g;
+                                data[p_idx + 2] = out_b;
+                                data[p_idx + 3] = out_a;
+                            }
                         }
-
-                        let p_idx = ((py * pw + px) * 4) as usize;
-                        let data = pm.data_mut();
-                        let dst_r = data[p_idx] as f32 / 255.0;
-                        let dst_g = data[p_idx + 1] as f32 / 255.0;
-                        let dst_b = data[p_idx + 2] as f32 / 255.0;
-                        let dst_a = data[p_idx + 3] as f32 / 255.0;
-
-                        let src_r = base_r * alpha_f;
-                        let src_g = base_g * alpha_f;
-                        let src_b = base_b * alpha_f;
-                        let src_a = alpha_f;
-
-                        let inv_a = 1.0 - src_a;
-                        let out_r = ((src_r + dst_r * inv_a).clamp(0.0, 1.0) * 255.0).round() as u8;
-                        let out_g = ((src_g + dst_g * inv_a).clamp(0.0, 1.0) * 255.0).round() as u8;
-                        let out_b = ((src_b + dst_b * inv_a).clamp(0.0, 1.0) * 255.0).round() as u8;
-                        let out_a = ((src_a + dst_a * inv_a).clamp(0.0, 1.0) * 255.0).round() as u8;
-
-                        data[p_idx] = out_r;
-                        data[p_idx + 1] = out_g;
-                        data[p_idx + 2] = out_b;
-                        data[p_idx + 3] = out_a;
                     }
-                }
+                    base_x += metrics.advance_width * st.g.transform.sx;
+                });
             }
-            base_x += metrics.advance_width * st.g.transform.sx;
-        }
+        });
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cached_glyphs_match_font_rasterization_across_sizes_and_eviction() {
+        let mut cache = GlyphCache::default();
+        for size in [0.0, 8.0, 8.125, 12.0, 24.0, 64.0, 400.0] {
+            for ch in "AaÑñßİáÉ0123!? ⇧←✓\n".chars() {
+                let (expected, pixels) = FONT.rasterize(ch, size);
+                for _ in 0..2 {
+                    cache.with_glyph(ch, size, |metrics, bitmap| {
+                        assert_eq!(bitmap, pixels);
+                        assert_eq!((metrics.width, metrics.height, metrics.xmin, metrics.ymin),
+                                   (expected.width, expected.height, expected.xmin, expected.ymin));
+                        assert_eq!(metrics.advance_width.to_bits(), expected.advance_width.to_bits());
+                    });
+                }
+                assert!(cache.bytes <= GLYPH_CACHE_BYTES);
+                assert!(cache.glyphs.len() <= GLYPH_CACHE_ENTRIES);
+            }
+        }
+        // Zero-sized bitmaps still need a metadata bound.
+        for n in 1..=600 {
+            cache.with_glyph(' ', n as f32 / 16.0, |_, _| ());
+            assert!(cache.glyphs.len() <= GLYPH_CACHE_ENTRIES);
+        }
+    }
+
+    #[test]
+    fn offscreen_layers_have_identical_pixels_without_native_buffers() {
+        let offscreen = ImageSurface::create_offscreen(Format::ARgb32, 96, 64).unwrap();
+        let presented = ImageSurface::create(Format::ARgb32, 96, 64).unwrap();
+        assert!(offscreen.0.dc.is_null());
+        assert!(offscreen.0.pixels.is_null());
+        assert!(!presented.0.dc.is_null());
+        for surface in [&offscreen, &presented] {
+            let cr = Context::new(surface).unwrap();
+            cr.set_source_rgba(0.2, 0.4, 0.6, 1.0);
+            cr.paint().unwrap();
+            cr.rectangle(5.0, 5.0, 80.0, 50.0);
+            cr.clip();
+            cr.set_source_rgba(1.0, 1.0, 1.0, 0.6);
+            cr.set_font_size(20.0);
+            cr.move_to(8.0, 30.0);
+            cr.show_text("Ña✓").unwrap();
+            surface.flush();
+        }
+        assert_eq!(offscreen.0.pixmap.borrow().data(), presented.0.pixmap.borrow().data());
+    }
+}
+
