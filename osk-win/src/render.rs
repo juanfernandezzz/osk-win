@@ -1045,10 +1045,18 @@ impl View<'_> {
         let column = rows[row].keys.len() - 1;
         if rows[row].keys[column].is_gap() {
             let (x, y, w, h) = self.key_rect(row, column);
-            let right = (x + w - m.g).min(self.width as f64 - self.handle_size() as f64 - m.g);
+            let top = y + m.g;
+            let handle = f64::from(self.handle_size());
+            let space_above_handle = f64::from(self.height) - handle - top;
+            let mut right = x + w - m.g;
+            let mut height = (m.s * 0.35).clamp(10.0, 18.0).min((h - 2.0 * m.g).max(0.0));
+            if space_above_handle >= 9.0 {
+                height = height.min(space_above_handle);
+            } else {
+                right = right.min(f64::from(self.width) - handle - m.g);
+            }
             let width = (m.s * 1.25).clamp(38.0, 70.0).min((right - x - m.g).max(0.0));
-            let height = (m.s * 0.35).clamp(10.0, 18.0).min((h - 2.0 * m.g).max(0.0));
-            return Rect { x: right.max(0.0) - width, y: y + m.g, w: width, h: height };
+            return Rect { x: right.max(0.0) - width, y: top, w: width, h: height };
         }
         let right = (self.width as f64 - self.handle_size() as f64 - m.g).max(0.0);
         let width = (m.s * 1.25).clamp(38.0, 70.0).min(right);

@@ -24,7 +24,7 @@ def main():
             try:
                 proc = subprocess.run([p, "--ignored", "probe_cold_rebuild_hot", "--nocapture"],
                                       capture_output=True, text=True, timeout=180, env=env, check=True)
-                cases = json.loads(re.search(r"^probe: (.+)$", proc.stdout, re.M)[1])
+                cases = json.loads(re.search(r"probe: (\[.+\])", proc.stdout)[1])
                 expected = [(w, mode, n) for w in (800, 1440)
                             for mode, n in (("first", 1), ("rebuild", 80), ("hot", 500))]
                 assert [(c["size"][0], c["mode"], c["frames"]) for c in cases] == expected

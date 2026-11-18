@@ -33,7 +33,7 @@ fn version_does_not_cover_keys_or_resize_handle() {
             v.layout_idx = layout;
             v.grid_cols = grid_cols(layout_at(layout));
             let r = v.version_rect();
-            assert!(r.w > 0.0 && r.h > 0.0);
+            assert!(r.w >= 20.0 && r.h >= 9.0, "legible target: layout={layout}, {w}x{h}, {}x{}", r.w, r.h);
             assert!(r.x >= 0.0 && r.y >= 0.0 && r.x + r.w <= f64::from(w) && r.y + r.h <= f64::from(h));
             let overlaps = |x: f64, y: f64, width: f64, height: f64| {
                 r.x < x + width && x < r.x + r.w && r.y < y + height && y < r.y + r.h

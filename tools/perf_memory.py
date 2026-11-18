@@ -1,6 +1,8 @@
 """Sample headless Windows process memory/GDI objects; separate from timing runs.
 
-Usage: python tools/perf_memory.py BASELINE CANDIDATE OUTPUT_DIR
+Usage: python tools/perf_memory.py BASELINE CANDIDATE OUTPUT_DIR [REFERENCE_DIR]
+For an intentional UI change, supply reviewed PNGs named SIDE-WxH.png
+for each side and size. The default requires identical output across sides.
 Reports sampled peaks, not allocation counts or whole desktop UI memory.
 Requires Pillow for decoding and validating the PNG output.
 """
@@ -46,7 +48,9 @@ def image_identity(path, size):
             "pixels_sha256": hashlib.sha256(pixels).hexdigest(), "pixel_bytes": len(pixels)}
 
 def main():
-    baseline, candidate, directory = map(Path, sys.argv[1:])
+    baseline, candidate, directory, *references = map(Path, sys.argv[1:])
+    if len(references) > 1:
+        raise ValueError("Expected at most one reference image directory")
     directory.mkdir(parents=True, exist_ok=True)
     results = []
     executables = {"baseline": baseline.resolve(), "candidate": candidate.resolve()}
@@ -64,6 +68,9 @@ def main():
     save()
     expected_images = {}
     for size in ["800x300", "1440x540"]:
+        if references:
+            for side in executables:
+                expected_images[(side, size)] = image_identity(references[0] / f"{side}-{size}.png", size)["pixels_sha256"]
         for trial in range(5):
             sides = [("baseline", baseline), ("candidate", candidate)]
             for side, exe in (sides if trial % 2 == 0 else sides[::-1]):
@@ -130,7 +137,7 @@ def main():
                         record["error"] = str(error)
                         save()
                         raise
-                expected = expected_images.setdefault(size, record["pixels_sha256"])
+                expected = expected_images.setdefault((side, size) if references else size, record["pixels_sha256"])
                 if expected != record["pixels_sha256"]:
                     record["error"] = "image mismatch"
                     save()

@@ -24,12 +24,18 @@ class MemoryHarnessTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 perf.image_identity(path, "2x3")
 
-    def exercise(self, *, frames=1000, memory_ok=1, mismatch=False):
+    def exercise(self, *, frames=1000, memory_ok=1, mismatch=False, references=False):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
             baseline, candidate = directory / "a.exe", directory / "b.exe"
             baseline.write_bytes(b"baseline identity")
             candidate.write_bytes(b"candidate identity")
+            args = ["perf_memory.py", str(baseline), str(candidate), str(directory)]
+            if references:
+                args.append(str(directory))
+                for side, color in [("baseline", "blue"), ("candidate", "red")]:
+                    for size in ["800x300", "1440x540"]:
+                        Image.new("RGB", tuple(map(int, size.split("x"))), color).save(directory / f"{side}-{size}.png")
             class Process:
                 def __init__(self, command, stdout, stderr, env):
                     self._handle = 1
@@ -46,7 +52,7 @@ class MemoryHarnessTests(unittest.TestCase):
                     if self.polls > 1: self.returncode = 0
                     return self.returncode
             error = None
-            with patch.object(perf.sys, "argv", ["perf_memory.py", str(baseline), str(candidate), str(directory)]), \
+            with patch.object(perf.sys, "argv", args), \
                  patch.object(perf.platform, "platform", return_value="test platform"), \
                  patch.object(perf.subprocess, "Popen", Process), \
                  patch.object(perf, "get_memory", return_value=memory_ok), \
@@ -84,6 +90,14 @@ class MemoryHarnessTests(unittest.TestCase):
         self.assertIsNotNone(error)
         self.assertFalse(report["valid"])
         self.assertEqual(report["runs"][-1]["error"], "image mismatch")
+
+    def test_intentional_visual_change_checks_each_reference(self):
+        report, error = self.exercise(mismatch=True, references=True)
+        self.assertIsNone(error)
+        self.assertTrue(report["valid"])
+        report, error = self.exercise(references=True)
+        self.assertIsNotNone(error)
+        self.assertFalse(report["valid"])
 
 
 if __name__ == "__main__":
