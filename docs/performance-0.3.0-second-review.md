@@ -73,3 +73,13 @@ The installed discovery skill verified the benchmark and property-testing
 selections. The benchmark checklist led to independent CPU profiling and work,
 image and binary validation. Property-testing guidance led to bounded state
 sequences and independent reference oracles without new Rust dependencies.
+
+The distribution assets matched the original byte for byte (font SHA-256
+0e9698f561568a0d83ce644a495d228a6f83d8d0404906223852877438b171c2,
+certificate 877731dc5ce458ae8477bbc18b7fb537fa691432f010c82d3b2758ec210c73d4).
+For the older revisions, build the release test executable in an archived copy:
+include the portable cache probe from render.rs as a test module, omit the
+version-placement test and initialize the older View's dict_state to Idle
+and levels to an empty Vec. To reproduce the old recording-state sequence,
+set Recording and alternate fake_wave_levels(WAVE_BARS) with zero levels each
+step. The timing probe always uses the idle voice state.

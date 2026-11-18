@@ -3,7 +3,7 @@
 
 use std::os::windows::process::CommandExt;
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU8, Ordering};
 
 use windows::core::HSTRING;
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -14,18 +14,36 @@ const REPO: &str = "juanfernandezzz/osk-win";
 const INSTALLER: &str = "osk-win-setup.exe";
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
-static CHECKING: AtomicBool = AtomicBool::new(false);
+const IDLE: u8 = 0;
+const BACKGROUND: u8 = 1;
+const REQUESTED: u8 = 2;
+static CHECKING: AtomicU8 = AtomicU8::new(IDLE);
 
-struct CheckGuard<'a>(&'a AtomicBool);
+struct CheckGuard<'a>(Option<&'a AtomicU8>);
 
 impl<'a> CheckGuard<'a> {
-    fn acquire(flag: &'a AtomicBool) -> Option<Self> {
-        flag.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).ok().map(|_| Self(flag))
+    fn acquire(flag: &'a AtomicU8, manual: bool) -> Option<Self> {
+        let request = if manual { REQUESTED } else { BACKGROUND };
+        (flag.fetch_max(request, Ordering::AcqRel) == IDLE).then(|| Self(Some(flag)))
+    }
+
+    // A click either promotes this check or starts a new one after its
+    // silent completion. Never clear a newer worker's state on drop.
+    fn should_inform(&mut self) -> bool {
+        let flag = self.0.expect("check still active");
+        if flag.compare_exchange(BACKGROUND, IDLE, Ordering::AcqRel, Ordering::Acquire).is_ok() {
+            self.0 = None;
+            false
+        } else {
+            true
+        }
     }
 }
 
 impl Drop for CheckGuard<'_> {
-    fn drop(&mut self) { self.0.store(false, Ordering::Release); }
+    fn drop(&mut self) {
+        if let Some(flag) = self.0 { flag.store(IDLE, Ordering::Release); }
+    }
 }
 
 fn inform(text: &str) {
@@ -37,7 +55,9 @@ fn inform(text: &str) {
 
 #[cfg(not(test))]
 pub(crate) fn check_manually() {
-    start_check(true);
+    if let Some(guard) = CheckGuard::acquire(&CHECKING, true) {
+        std::thread::spawn(move || run_check(guard));
+    }
 }
 
 #[cfg(test)]
@@ -50,18 +70,11 @@ pub(crate) fn check_manually() {
     MANUAL_CHECKS.with(|count| count.set(count.get() + 1));
 }
 
-fn start_check(manual: bool) {
-    let Some(guard) = CheckGuard::acquire(&CHECKING) else {
-        if manual { inform("Ya se está comprobando una actualización. Espera a que termine."); }
-        return;
-    };
-    std::thread::spawn(move || {
-        let _guard = guard;
-        if let Err(e) = check(manual) {
-            warn!("osk: update check failed: {e}");
-            if manual { inform(&format!("No se pudo comprobar si hay actualizaciones.\n\n{e}")); }
-        }
-    });
+fn run_check(mut guard: CheckGuard<'_>) {
+    if let Err(e) = check(&mut guard) {
+        warn!("osk: update check failed: {e}");
+        if guard.should_inform() { inform(&format!("No se pudo comprobar si hay actualizaciones.\n\n{e}")); }
+    }
 }
 
 /// Check in the background, so a slow or missing network never delays the
@@ -70,7 +83,9 @@ fn start_check(manual: bool) {
 pub fn check_at_startup() {
     std::thread::spawn(|| {
         std::thread::sleep(std::time::Duration::from_secs(5));
-        start_check(false);
+        if let Some(guard) = CheckGuard::acquire(&CHECKING, false) {
+            run_check(guard);
+        }
     });
 }
 
@@ -108,13 +123,13 @@ fn available_update(release: &serde_json::Value, current: &str) -> Result<Option
     Ok(Some((tag.to_owned(), url.to_owned())))
 }
 
-fn check(manual: bool) -> Result<(), String> {
+fn check(guard: &mut CheckGuard<'_>) -> Result<(), String> {
     let api = format!("https://api.github.com/repos/{REPO}/releases/latest");
     let release: serde_json::Value =
         serde_json::from_slice(&curl(&["-m", "15", &api])?).map_err(|e| e.to_string())?;
     let current = VERSION;
     let Some((tag, url)) = available_update(&release, current)? else {
-        if manual { inform(&format!("osk-win {current} está actualizado. No hay una versión más reciente disponible.")); }
+        if guard.should_inform() { inform(&format!("osk-win {current} está actualizado. No hay una versión más reciente disponible.")); }
         return Ok(());
     };
     let text = format!(
@@ -174,15 +189,21 @@ mod tests {
 
     #[test]
     fn only_one_update_check_runs_and_completion_allows_retry() {
-        let checking = AtomicBool::new(false);
-        let first = CheckGuard::acquire(&checking).unwrap();
+        let checking = AtomicU8::new(IDLE);
+        let mut first = CheckGuard::acquire(&checking, false).unwrap();
         std::thread::scope(|scope| {
             for _ in 0..8 {
-                scope.spawn(|| assert!(CheckGuard::acquire(&checking).is_none()));
+                scope.spawn(|| assert!(CheckGuard::acquire(&checking, true).is_none()));
             }
         });
+        assert!(first.should_inform(), "manual click gets the startup check's result");
         drop(first);
-        assert!(CheckGuard::acquire(&checking).is_some());
+        let mut quiet = CheckGuard::acquire(&checking, false).unwrap();
+        assert!(!quiet.should_inform());
+        let mut next = CheckGuard::acquire(&checking, true).unwrap();
+        drop(quiet);
+        assert!(CheckGuard::acquire(&checking, false).is_none());
+        assert!(next.should_inform());
     }
 
     #[test]
