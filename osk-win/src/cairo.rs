@@ -83,6 +83,8 @@ const GLYPH_CACHE_ENTRIES: usize = 256;
 struct GlyphCache {
     glyphs: HashMap<(char, u32), (fontdue::Metrics, Vec<u8>)>,
     bytes: usize,
+    #[cfg(test)]
+    rasterizations: usize,
 }
 
 impl GlyphCache {
@@ -91,6 +93,8 @@ impl GlyphCache {
         if let Some((metrics, bitmap)) = self.glyphs.get(&key) {
             return draw(metrics, bitmap);
         }
+        #[cfg(test)]
+        { self.rasterizations += 1; }
         let (metrics, bitmap) = FONT.rasterize(ch, size);
         let result = draw(&metrics, &bitmap);
         // Oversized glyphs are drawn once without being retained. Resizing can
@@ -389,7 +393,7 @@ impl Context {
 
     pub fn new_path(&self) {
         let mut st = self.st.borrow_mut();
-        st.pb = PathBuilder::new();
+        st.pb.clear();
         st.cur = None;
     }
 
@@ -493,6 +497,7 @@ impl Context {
             st.g.transform,
             st.g.clip_mask.as_ref(),
         );
+        st.pb = path.clear();
         Ok(())
     }
 
@@ -528,6 +533,7 @@ impl Context {
             st.g.transform,
             st.g.clip_mask.as_ref(),
         );
+        st.pb = path.clear();
         Ok(())
     }
 
@@ -551,6 +557,7 @@ impl Context {
             mask.fill_path(&path, FillRule::Winding, has_curves, ts);
             st.g.clip_mask = Some(mask);
         }
+        st.pb = path.clear();
     }
 
     pub fn reset_clip(&self) {
@@ -713,6 +720,137 @@ impl Context {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reused_paths_discard_geometry_across_operations() {
+        fn draw(cr: &Context, i: usize) {
+            cr.new_path();
+            cr.rectangle(0.0, 0.0, 32.0, 24.0);
+            cr.new_path(); // abandon a populated path
+            cr.move_to(1.0, 1.0);
+            cr.fill().unwrap(); // a single point produces no finished path
+            cr.stroke().unwrap(); // an empty path also produces no geometry
+            cr.set_source_rgba(0.2, 0.4, 0.7, 0.2);
+            cr.rectangle((i % 13) as f64, (i % 7) as f64, 5.0, 4.0);
+            cr.fill().unwrap();
+            cr.set_line_width(0.7);
+            cr.move_to(-2.0, (i % 23) as f64);
+            cr.line_to(25.0, (i % 17) as f64);
+            cr.stroke().unwrap();
+            cr.rectangle(3.0, 2.0, 7.0, 11.0);
+            cr.clip();
+            cr.paint().unwrap();
+            cr.reset_clip();
+        }
+        let actual = ImageSurface::create_offscreen(Format::ARgb32, 32, 24).unwrap();
+        let expected = ImageSurface::create_offscreen(Format::ARgb32, 32, 24).unwrap();
+        let reused = Context::new(&actual).unwrap();
+        for i in 0..128 {
+            draw(&reused, i);
+            draw(&Context::new(&expected).unwrap(), i);
+            assert_eq!(actual.0.pixmap.borrow().data(), expected.0.pixmap.borrow().data(), "operation sequence {i}");
+        }
+    }
+
+    #[test]
+    fn native_blit_preserves_bgra_pixels_on_tiny_and_regular_surfaces() {
+        for (w, h) in [(1, 1), (2, 3), (97, 65), (800, 300)] {
+            let source = ImageSurface::create(Format::ARgb32, w, h).unwrap();
+            let destination = ImageSurface::create(Format::ARgb32, w, h).unwrap();
+            {
+                let mut pixmap = source.0.pixmap.borrow_mut();
+                for (i, pixel) in pixmap.data_mut().chunks_exact_mut(4).enumerate() {
+                    pixel.copy_from_slice(&[(i % 251) as u8, (i % 127) as u8, (i % 61) as u8, 255]);
+                }
+            }
+            source.blit_to_hdc(destination.0.dc);
+            // GDI writes are batched; read DIB memory only after synchronization.
+            unsafe { GdiFlush(); }
+            let native = unsafe { std::slice::from_raw_parts(destination.0.pixels, (w * h * 4) as usize) };
+            let pixmap = source.0.pixmap.borrow();
+            for (rgba, bgra) in pixmap.data().chunks_exact(4).zip(native.chunks_exact(4)) {
+                assert_eq!(bgra, &[rgba[2], rgba[1], rgba[0], rgba[3]]);
+            }
+        }
+    }
+
+    #[test]
+    fn glyph_hits_evictions_oversize_and_revisits() {
+        let mut cache = GlyphCache::default();
+        let check = |cache: &mut GlyphCache, ch, size| {
+            let (expected, pixels) = FONT.rasterize(ch, size);
+            cache.with_glyph(ch, size, |metrics, bitmap| {
+                assert_eq!(*metrics, expected);
+                assert_eq!(bitmap, pixels);
+            });
+            assert_eq!(cache.bytes, cache.glyphs.values().map(|(_, b)| b.len()).sum::<usize>());
+            assert!(cache.bytes <= GLYPH_CACHE_BYTES);
+            assert!(cache.glyphs.len() <= GLYPH_CACHE_ENTRIES);
+        };
+        check(&mut cache, 'A', 12.0);
+        check(&mut cache, 'A', 12.0);
+        assert_eq!(cache.rasterizations, 1, "a hit must avoid rasterizing");
+        check(&mut cache, 'A', f32::from_bits(12.0f32.to_bits() + 1));
+        assert_eq!(cache.rasterizations, 2, "exact size bits identify a glyph");
+
+        // Empty payloads isolate the metadata/entry limit.
+        cache = GlyphCache::default();
+        for i in 1..=GLYPH_CACHE_ENTRIES {
+            check(&mut cache, ' ', i as f32);
+        }
+        assert_eq!(cache.glyphs.len(), GLYPH_CACHE_ENTRIES);
+        check(&mut cache, ' ', 257.0);
+        assert_eq!(cache.glyphs.len(), 1);
+        check(&mut cache, ' ', 1.0);
+        assert_eq!(cache.rasterizations, 258, "evicted entries must be rebuilt");
+
+        cache = GlyphCache::default();
+        let mut byte_evictions = 0;
+        for size in 200..220 {
+            let previous = cache.bytes;
+            check(&mut cache, 'W', size as f32);
+            if cache.bytes < previous { byte_evictions += 1; }
+        }
+        assert!(byte_evictions > 0, "exercise the byte limit before the entry limit");
+        let before = cache.rasterizations;
+        check(&mut cache, 'W', 200.0);
+        assert_eq!(cache.rasterizations, before + 1);
+        let retained = (cache.bytes, cache.glyphs.len());
+        let (_, huge) = FONT.rasterize('W', 800.0);
+        assert!(huge.len() > GLYPH_CACHE_BYTES);
+        for _ in 0..2 { check(&mut cache, 'W', 800.0); }
+        assert_eq!((cache.bytes, cache.glyphs.len()), retained);
+        assert_eq!(cache.rasterizations, before + 3);
+    }
+
+    #[test]
+    fn nested_clips_restore_pixels_on_tiny_surfaces() {
+        for (w, h) in [(1, 1), (2, 3), (7, 5), (96, 64)] {
+            let nested = ImageSurface::create_offscreen(Format::ARgb32, w, h).unwrap();
+            let reference = ImageSurface::create_offscreen(Format::ARgb32, w, h).unwrap();
+            for (surface, nesting) in [(&nested, true), (&reference, false)] {
+                let cr = Context::new(surface).unwrap();
+                cr.rectangle(0.0, 0.0, w as f64, h as f64);
+                cr.clip();
+                if nesting {
+                    cr.save().unwrap();
+                    cr.rectangle(0.0, 0.0, 0.5, 0.5);
+                    cr.clip();
+                    cr.save().unwrap();
+                    cr.scale(1.25, 1.5);
+                    cr.reset_clip();
+                    cr.restore().unwrap();
+                    cr.restore().unwrap();
+                }
+                cr.set_source_rgba(0.2, 0.4, 0.8, 0.7);
+                cr.paint().unwrap();
+                cr.set_font_size(9.125);
+                cr.move_to(-2.0, 5.0);
+                cr.show_text("ÑAg").unwrap();
+            }
+            assert_eq!(nested.0.pixmap.borrow().data(), reference.0.pixmap.borrow().data(), "{w}x{h}");
+        }
+    }
 
     #[test]
     fn cached_glyphs_match_font_rasterization_across_sizes_and_eviction() {

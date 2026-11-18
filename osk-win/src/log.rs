@@ -1,4 +1,4 @@
-//! The single print site for osk-win's UI and dictation paths:
+//! The single print site for osk-win's warnings:
 //! user-facing warnings and errors.
 //!
 //! osk-win is a GUI-subsystem program, so stderr usually goes nowhere;

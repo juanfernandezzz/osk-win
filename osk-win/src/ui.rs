@@ -5,7 +5,7 @@
 //! state is the shared [`Interaction`]; a frame paints the shared
 //! [`View`] from `render.rs`. This file is the Win32 side of the Linux
 //! `ui.rs`: the window, its messages, and a timer armed only for the
-//! next deadline (key repeat, hold, flash, the handle ease, dictation),
+//! next deadline (key repeat, hold, flash, the handle ease),
 //! so an idle keyboard runs nothing.
 //!
 //! `WM_MOUSEACTIVATE` returns `MA_NOACTIVATE`, so the keyboard never
@@ -46,14 +46,10 @@ use osk_core::key::{fn_code, key, Click, Key, KeyKind, Layout};
 use osk_core::mods::{mod_index, ModKeyState, MOD_META, NMODS};
 use osk_core::layout::ALL_LAYOUTS;
 use osk_core::metrics::Metrics;
-#[cfg(feature = "dictation")]
-use osk_core::typekey::type_text;
 use osk_core::typekey::KeySink;
 
 use crate::backend::{Backend, OSK_MARK};
 use crate::cairo::{Context, FontSlant, FontWeight, Format, ImageSurface};
-#[cfg(feature = "dictation")]
-use crate::render::DictState;
 use crate::render::{
     self, now_ms, BarLayout, KeyCache, Rect, Theme, THEMES, View, FONT,
 };
@@ -62,10 +58,8 @@ use crate::render::{
 const MIN_W: i32 = 200;
 const MIN_H: i32 = 180;
 const FLASH_MS: u64 = 60;
-/// Frame pacing of the handle ease and the dictation waveform.
+/// Frame pacing of the handle ease.
 const ANIM_FRAME_MS: u64 = 16;
-#[cfg(feature = "dictation")]
-const DICT_FRAME_MS: u64 = 33;
 
 const WM_MOUSELEAVE: u32 = 0x02A3;
 const MA_NOACTIVATE: isize = 3;
@@ -212,6 +206,7 @@ pub struct State {
     theme_rect: Rect,
     close_rect: Rect,
     min_rect: Rect,
+    version_rect: Rect,
     /// osk.exe's Fn: the next number-row key sends F1..F12.
     fn_on: bool,
     /// The foreground window at the last click on the keyboard.
@@ -226,15 +221,6 @@ pub struct State {
     theme_menu_open: bool,
     theme_menu_rect: Rect,
     theme_item_rects: [Rect; render::MENU_SLOTS],
-    mic_rect: Rect,
-    #[cfg(feature = "dictation")]
-    dict_state: DictState,
-    #[cfg(feature = "dictation")]
-    recorder: Option<crate::dictate::Recorder>,
-    #[cfg(feature = "dictation")]
-    dict_rx: Option<std::sync::mpsc::Receiver<Result<String, String>>>,
-    #[cfg(feature = "dictation")]
-    dict_frame_due: u64,
     quit: bool,
 }
 
@@ -429,6 +415,7 @@ impl State {
             theme_rect: Rect::default(),
             close_rect: Rect::default(),
             min_rect: Rect::default(),
+            version_rect: Rect::default(),
             fn_on: false,
             typing_in: 0,
             held: Vec::new(),
@@ -439,15 +426,6 @@ impl State {
             theme_menu_open: false,
             theme_menu_rect: Rect::default(),
             theme_item_rects: [Rect::default(); render::MENU_SLOTS],
-            mic_rect: Rect::default(),
-            #[cfg(feature = "dictation")]
-            dict_state: DictState::Idle,
-            #[cfg(feature = "dictation")]
-            recorder: None,
-            #[cfg(feature = "dictation")]
-            dict_rx: None,
-            #[cfg(feature = "dictation")]
-            dict_frame_due: 0,
             quit: false,
         }
     }
@@ -590,22 +568,9 @@ impl State {
             held: &self.held,
             caps_on: self.caps_on,
             ctl: &self.ctl,
-            #[cfg(feature = "dictation")]
-            dict_state: self.dict_state,
-            #[cfg(feature = "dictation")]
-            levels: Vec::new(),
         }
     }
 
-    #[cfg(feature = "dictation")]
-    fn wave_levels(&self) -> Vec<f32> {
-        if self.dict_state == DictState::Recording {
-            if let Some(rec) = self.recorder.as_ref() {
-                return rec.levels(render::WAVE_BARS);
-            }
-        }
-        Vec::new()
-    }
 
     // ---- redraw ----
 
@@ -651,7 +616,7 @@ impl State {
         self.theme_rect = bar.theme_rect;
         self.close_rect = bar.close_rect;
         self.min_rect = bar.min_rect;
-        self.mic_rect = bar.mic_rect;
+        self.version_rect = bar.version_rect;
         self.theme_menu_rect = bar.theme_menu_rect;
         self.theme_item_rects = bar.theme_item_rects;
         self.last_hot = self.hot_sig();
@@ -667,8 +632,6 @@ impl State {
         // Out of self while the view borrows it.
         let mut cache = self.key_cache.take();
         let view = self.view();
-        #[cfg(feature = "dictation")]
-        let view = View { levels: self.wave_levels(), ..view };
         view.paint(&cr, &bar, &mut cache);
         self.key_cache = cache;
         Some(bar)
@@ -870,8 +833,8 @@ impl State {
             | (at(&self.theme_rect) << 9)
             | (u32::from(self.theme_menu_open) << 8)
             | (menu_item << 4)
-            | (at(&self.mic_rect) << 2)
             | (at(&self.min_rect) << 3)
+            | (at(&self.version_rect) << 2)
             | (at(&self.close_rect) << 1)
             | u32::from(self.view().handle_hov())
     }
@@ -923,14 +886,13 @@ impl State {
             self.request_redraw();
             return;
         }
-        #[cfg(feature = "dictation")]
-        if self.mic_rect.contains(x, y) {
-            self.on_mic();
-            return;
-        }
         if self.close_rect.contains(x, y) {
             self.save_config();
             self.quit = true;
+            return;
+        }
+        if self.version_rect.contains(x, y) {
+            crate::update::check_manually();
             return;
         }
         if self.min_rect.contains(x, y) {
@@ -965,14 +927,6 @@ impl State {
         let Some(k) = self.key_at(self.px, self.py) else {
             return;
         };
-        // While dictation records, any key stops it and transcribes,
-        // so the hand never travels back to the small mic button. The
-        // key is the stop gesture only; nothing is typed.
-        #[cfg(feature = "dictation")]
-        if self.dict_state == DictState::Recording {
-            self.on_mic();
-            return;
-        }
         let mut key = windows_click(*self.key_of(k));
         if key.code_u16() == key::KEY_FN {
             self.fn_on = !self.fn_on;
@@ -1033,71 +987,8 @@ impl State {
         self.request_redraw();
     }
 
-    // ---- dictation ----
 
-    /// Mic button: start or stop dictation.
-    #[cfg(feature = "dictation")]
-    fn on_mic(&mut self) {
-        match self.dict_state {
-            DictState::Idle => match crate::dictate::Recorder::start() {
-                Ok(rec) => {
-                    self.recorder = Some(rec);
-                    self.dict_state = DictState::Recording;
-                    self.dict_frame_due = now_ms();
-                    self.request_redraw();
-                }
-                Err(e) => warn!("[dictate] {e}"),
-            },
-            DictState::Recording => {
-                let Some(rec) = self.recorder.take() else {
-                    self.dict_state = DictState::Idle;
-                    self.request_redraw();
-                    return;
-                };
-                let rate = rec.rate;
-                let raw = rec.stop();
-                let (tx, rx) = std::sync::mpsc::channel();
-                self.dict_rx = Some(rx);
-                self.dict_state = DictState::Transcribing;
-                self.request_redraw();
-                std::thread::spawn(move || {
-                    let pcm = crate::dictate::resample_to_16k(&raw, rate as usize);
-                    drop(raw);
-                    let _ = tx.send(crate::dictate::transcribe(&pcm));
-                });
-            }
-            DictState::Transcribing => {}
-        }
-    }
 
-    /// A transcription finished: type the text and return to idle.
-    #[cfg(feature = "dictation")]
-    fn finish_dictation(&mut self, result: Result<String, String>) {
-        self.dict_state = DictState::Idle;
-        self.dict_rx = None;
-        self.request_redraw();
-        match result {
-            Ok(text) if !text.is_empty() => {
-                if let Some(map) = self.ctl.charmap() {
-                    let pause = || std::thread::sleep(std::time::Duration::from_millis(20));
-                    if let Err(e) = type_text(
-                        &mut ModSink {
-                            b: self.backend.as_mut(),
-                            down: &mut self.mods_down,
-                        },
-                        map,
-                        &text,
-                        pause,
-                    ) {
-                        warn!("[dictate] failed to type: {e:?}");
-                    }
-                    self.sync_mods();
-                }
-            }
-            Ok(_) => {}
-            Err(e) => warn!("[dictate] {e}"),
-        }
-    }
 
     // ---- timed work ----
 
@@ -1144,17 +1035,6 @@ impl State {
         if self.handle_anim_since.is_some_and(|s| now.saturating_sub(s) <= render::HANDLE_ANIM_MS + ANIM_FRAME_MS) {
             self.request_redraw();
         }
-        #[cfg(feature = "dictation")]
-        {
-            if self.dict_state == DictState::Recording && now >= self.dict_frame_due {
-                self.request_redraw();
-                self.dict_frame_due = now + DICT_FRAME_MS;
-            }
-            let done = self.dict_rx.as_ref().and_then(|rx| rx.try_recv().ok());
-            if let Some(result) = done {
-                self.finish_dictation(result);
-            }
-        }
         self.backend.pump();
     }
 
@@ -1188,13 +1068,6 @@ impl State {
         }
         if self.handle_anim_active() {
             consider(now + ANIM_FRAME_MS);
-        }
-        #[cfg(feature = "dictation")]
-        match self.dict_state {
-            DictState::Recording => consider(self.dict_frame_due),
-            // Poll for the result while a transcription runs.
-            DictState::Transcribing => consider(now + 50),
-            DictState::Idle => {}
         }
         due.map(|d| d.saturating_sub(now).max(1))
     }
@@ -1795,28 +1668,72 @@ mod tests {
         assert_eq!((s.width, s.height), (w.max(MIN_W), h.max(MIN_H)));
     }
 
-    #[cfg(feature = "dictation")]
-    #[test]
-    fn a_key_stops_recording_instead_of_typing() {
-        let presses = std::rc::Rc::new(std::cell::Cell::new(0));
-        let mut s = state_counting(presses.clone());
-        s.dict_state = DictState::Recording;
-        point_at(&mut s, key::KEY_A);
-        s.on_button(true);
-        s.on_button(false);
-        assert!(s.dict_state != DictState::Recording, "the key ended the recording");
-        assert_eq!(presses.get(), 0, "the key typed nothing");
-        assert_eq!(s.interaction, Interaction::Idle);
-        // Once it is over, the same key types again.
-        point_at(&mut s, key::KEY_A);
-        s.on_button(true);
-        assert_eq!(presses.get(), 1);
-    }
 
     #[test]
     fn nothing_is_due_at_rest() {
         let s = state();
         assert_eq!(s.next_wake(), None);
+    }
+
+    #[test]
+    fn version_click_checks_updates_without_typing_or_resizing() {
+        let events = Events::default();
+        let mut s = latino(events.clone());
+        s.version_rect = s.view().version_rect();
+        s.px = (s.version_rect.x + s.version_rect.w / 2.0) as i32;
+        s.py = (s.version_rect.y + s.version_rect.h / 2.0) as i32;
+        s.inside = true;
+        crate::update::MANUAL_CHECKS.with(|count| count.set(0));
+        s.on_button(true);
+        s.on_button(false);
+        crate::update::MANUAL_CHECKS.with(|count| assert_eq!(count.get(), 1));
+        assert!(events.borrow().is_empty());
+        assert!(matches!(s.interaction, Interaction::Idle));
+        assert_eq!(s.next_wake(), None);
+    }
+
+    #[test]
+    fn deadlines_match_original_collected_minimum_with_controlled_clock() {
+        // Original v0.3.0 algorithm, kept separate from the allocation-free fold.
+        fn original(s: &State, now: u64) -> Option<u64> {
+            let mut due = Vec::new();
+            if let Interaction::Press { press_time, hold_fired, rep_next, .. } = s.interaction {
+                if let Some(next) = rep_next { due.push(next); }
+                if !hold_fired { due.push(press_time + interaction::HOLD_MS); }
+            }
+            if s.flash_key >= 0 { due.push(s.flash_until); }
+            if let Some(next) = s.ctl.tick_due() { due.push(next); }
+            if s.handle_anim_active() { due.push(now + ANIM_FRAME_MS); }
+            due.into_iter().min().map(|d| d.saturating_sub(now).max(1))
+        }
+        struct ResetClock;
+        impl Drop for ResetClock {
+            fn drop(&mut self) { render::TEST_NOW.with(|clock| clock.set(None)); }
+        }
+        let _reset = ResetClock;
+        let mut s = state();
+        let mut sink = MockBackend(Default::default(), Default::default());
+        let mut cases = 0;
+        for now in [0, 1, 159, 160, 199, 200, 499, 500, 1000, u64::MAX - 1000] {
+            render::TEST_NOW.with(|clock| clock.set(Some(now)));
+            for mask in 0..128u32 {
+                s.interaction = if mask & 1 != 0 {
+                    Interaction::Press { key: 0, press_time: 0, hold_fired: mask & 2 != 0,
+                                         rep_next: (mask & 4 != 0).then_some(500) }
+                } else { Interaction::Idle };
+                s.flash_key = if mask & 8 != 0 { 0 } else { -1 };
+                s.flash_until = 200;
+                s.handle_anim_since = (mask & 16 != 0).then_some(0);
+                s.ctl = Controller::new();
+                if mask & 32 != 0 {
+                    s.ctl.click_key(&Key::momentary("win", key::KEY_LEFTMETA, 25), 0, &mut crate::backend::BackendSink { b: &mut sink });
+                    assert!(s.ctl.tick_due().is_some());
+                }
+                assert_eq!(s.next_wake(), original(&s, now), "now={now}, mask={mask}");
+                cases += 1;
+            }
+        }
+        assert_eq!(cases, 1280);
     }
 
     #[test]

@@ -8,7 +8,7 @@
 //! `render.rs` over [`cairo`], a GDI implementation of the cairo calls
 //! it makes; the Win32 window and event loop are in [`ui`].
 
-// The shared modules (render.rs, dictate.rs) name the core `osk_core`,
+// The shared modules name the core `osk_core`,
 // as the Linux crate does.
 extern crate oskwin_core as osk_core;
 
@@ -27,8 +27,6 @@ mod ui;
 mod update;
 mod vk;
 
-#[cfg(feature = "dictation")]
-mod dictate;
 
 use clap::Parser;
 use osk_core::typekey::{type_text, CharMap};
@@ -81,11 +79,6 @@ struct Args {
     #[arg(long, requires = "render", value_name = "KEY_LABEL")]
     pressed: Option<String>,
 
-    /// Dictation frame for --render: "recording", "silence",
-    /// "transcribing", or "idle".
-    #[cfg(feature = "dictation")]
-    #[arg(long, requires = "render", value_name = "STATE")]
-    dict: Option<String>,
 
     /// After writing the --render PNG, redraw the same frame N more
     /// times and print the per-frame cost.
@@ -104,17 +97,7 @@ struct Args {
     #[arg(long)]
     theme: Option<String>,
 
-    /// Record the microphone for N seconds, transcribe offline, print
-    /// the text, and exit.
-    #[cfg(feature = "dictation")]
-    #[arg(long, value_name = "SECS")]
-    dictate_test: Option<u64>,
 
-    /// Transcribe a 16 kHz mono 16-bit WAV file offline and print the
-    /// model-load and transcription times with the text.
-    #[cfg(feature = "dictation")]
-    #[arg(long, value_name = "WAV")]
-    transcribe_file: Option<std::path::PathBuf>,
 }
 
 // CLI output: subcommand reports and startup notices print for the user.
@@ -138,33 +121,7 @@ fn main() {
         std::process::exit(if report.ok() { 0 } else { 1 });
     }
 
-    #[cfg(feature = "dictation")]
-    if let Some(path) = args.transcribe_file.as_ref() {
-        match dictate::transcribe_file_timed(path) {
-            Ok((load_ms, run_ms, text)) => {
-                println!("load {load_ms} ms, transcribe {run_ms} ms: {text}");
-                std::process::exit(0);
-            }
-            Err(e) => {
-                eprintln!("osk: transcription failed: {e}");
-                std::process::exit(1);
-            }
-        }
-    }
 
-    #[cfg(feature = "dictation")]
-    if let Some(secs) = args.dictate_test {
-        match dictate::record_and_transcribe(secs) {
-            Ok(text) => {
-                println!("{text}");
-                std::process::exit(0);
-            }
-            Err(e) => {
-                eprintln!("osk: dictation failed: {e}");
-                std::process::exit(1);
-            }
-        }
-    }
 
     // Headless render: no window and no injection backend, so a shot
     // is offline and deterministic.
@@ -200,8 +157,6 @@ fn main() {
             menu: args.menu,
             mods: args.mods.clone(),
             pressed: args.pressed.clone(),
-            #[cfg(feature = "dictation")]
-            dict: args.dict.clone(),
             bench_frames: args.bench_frames,
         };
         if let Err(e) = render::run(opts) {
@@ -243,8 +198,6 @@ fn main() {
         backend.destroy();
         rc
     } else {
-        #[cfg(feature = "dictation")]
-        dictate::preload();
         // ui::run takes ownership and destroys the backend on exit.
         ui::run(backend)
     };

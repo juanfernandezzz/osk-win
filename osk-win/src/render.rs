@@ -34,20 +34,7 @@ const U0: f64 = 46.0;
 // (letters, digits, and the arrow/symbol caps) in one font.
 pub(crate) const FONT: &str = "Adwaita Sans";
 
-/// Dictation lifecycle.
-#[cfg(feature = "dictation")]
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum DictState {
-    Idle,
-    Recording,
-    Transcribing,
-}
 
-/// Number of waveform bars drawn in the bar's free area while
-/// dictation records. The UI reads this many [`crate::dictate`]
-/// levels per frame; `--render` fakes the same count.
-#[cfg(feature = "dictation")]
-pub(crate) const WAVE_BARS: usize = 20;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Theme {
@@ -371,7 +358,14 @@ pub static THEMES: &[Theme] = &[
 
 static START: LazyLock<Instant> = LazyLock::new(Instant::now);
 
+#[cfg(test)]
+thread_local! {
+    pub(crate) static TEST_NOW: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+}
+
 pub(crate) fn now_ms() -> u64 {
+    #[cfg(test)]
+    if let Some(now) = TEST_NOW.with(|clock| clock.get()) { return now; }
     START.elapsed().as_millis() as u64
 }
 
@@ -470,17 +464,13 @@ impl Rect {
 /// Bar element positions measured during render.
 #[derive(Clone, Copy)]
 pub(crate) struct BarLayout {
-    /// The bar's free area: the strip between the left margin and one
-    /// gap before the first chip, where the dictation waveform runs.
-    pub(crate) text_left: f64,
-    pub(crate) text_right: f64,
     pub(crate) layout_rect: Rect,
     pub(crate) theme_rect: Rect,
     pub(crate) close_rect: Rect,
     pub(crate) min_rect: Rect,
+    pub(crate) version_rect: Rect,
     pub(crate) theme_menu_rect: Rect,
     pub(crate) theme_item_rects: [Rect; MENU_SLOTS],
-    pub(crate) mic_rect: Rect,
     /// Scale the theme menu was laid out at (1.0 = natural size; less
     /// when the window is too small for it), for its text and padding.
     pub(crate) menu_scale: f64,
@@ -523,15 +513,6 @@ pub(crate) struct View<'a> {
     pub(crate) caps_on: bool,
     /// Read access: modifiers.
     pub(crate) ctl: &'a Controller,
-    /// Mic button look.
-    #[cfg(feature = "dictation")]
-    pub(crate) dict_state: DictState,
-    /// Live waveform levels while dictation records: one level per
-    /// bar, oldest first, 0..1. Plain data, so render.rs never
-    /// depends on cpal; the Wayland UI reads the recorder, `--render`
-    /// fakes a fixed pattern.
-    #[cfg(feature = "dictation")]
-    pub(crate) levels: Vec<f32>,
 }
 
 /// How this frame's pointer, interaction and modifiers change one
@@ -638,57 +619,12 @@ pub struct RenderOpts {
     pub mods: Option<String>,
     /// Label of the key drawn in its held look.
     pub pressed: Option<String>,
-    /// Dictation frame to draw: "recording" (a fake speech-like
-    /// level pattern), "silence" (recording with an all-zero level
-    /// line), "transcribing" (nothing extra drawn) or "idle".
-    /// None = idle.
-    #[cfg(feature = "dictation")]
-    pub dict: Option<String>,
     /// After the PNG, time this many more frames of the same state
     /// and print the per-frame cost.
     pub bench_frames: usize,
 }
 
-/// The `--render --dict` state name, parsed into the dictation look
-/// that frame draws. Levels are plain data; the recording pattern is
-/// a fixed fake so the review shots are deterministic.
-#[cfg(feature = "dictation")]
-fn parse_dict(name: &str) -> Result<(DictState, Vec<f32>), String> {
-    Ok(match name {
-        "recording" => {
-            let levels = fake_wave_levels(WAVE_BARS);
-            (DictState::Recording, levels)
-        }
-        "silence" => (DictState::Recording, vec![0.0; WAVE_BARS]),
-        "transcribing" => (DictState::Transcribing, Vec::new()),
-        "idle" => (DictState::Idle, Vec::new()),
-        _ => {
-            return Err(format!(
-                "unknown dict state '{name}' (recording|silence|transcribing|idle)"
-            ))
-        }
-    })
-}
 
-/// The fake level pattern `--render --dict recording` draws: groups
-/// of speech-like bursts with pauses between them, oldest first, so
-/// the pattern reads like someone talking.
-#[cfg(feature = "dictation")]
-fn fake_wave_levels(n: usize) -> Vec<f32> {
-    (0..n)
-        .map(|i| {
-            let t = match n {
-                0 | 1 => 0.0,
-                _ => i as f64 / (n - 1) as f64,
-            };
-            // Slow word-group envelope with pauses, times a faster
-            // syllable wobble inside each group.
-            let group = ((t * 4.0 * std::f64::consts::PI).sin() * 0.5 + 0.5).powf(1.5);
-            let syl = (t * 21.0 * std::f64::consts::PI).sin() * 0.5 + 0.5;
-            (group * (0.25 + 0.75 * syl) * 0.95) as f32
-        })
-        .collect()
-}
 
 /// A sink that discards every injection event: `--render` shows the
 /// modifier state but never injects anywhere.
@@ -718,7 +654,7 @@ fn anim_pin(opts: &RenderOpts) -> f64 {
 /// "close", ...) instead of a key. These names are
 /// resolved after measure_bar; see [`bar_hover_target`].
 fn is_bar_hover_name(name: &str) -> bool {
-    matches!(name, "layout" | "theme" | "close" | "min" | "mic")
+    matches!(name, "layout" | "theme" | "close" | "min" | "version")
 }
 
 /// The rect a `--hover` bar name points at: the element's drawn rect
@@ -729,8 +665,7 @@ fn bar_hover_target(bar: &BarLayout, name: &str) -> Option<Rect> {
         "theme" => Some(bar.theme_rect),
         "close" => Some(bar.close_rect),
         "min" => Some(bar.min_rect),
-        #[cfg(feature = "dictation")]
-        "mic" => Some(bar.mic_rect),
+        "version" => Some(bar.version_rect),
         _ => None,
     }
 }
@@ -945,13 +880,6 @@ pub fn run(opts: RenderOpts) -> Result<(), String> {
 
     let ctl = headless_ctl(&opts, layout)?;
 
-    // The `--dict` faked state: plain data in the view, like a live
-    // session would pass.
-    #[cfg(feature = "dictation")]
-    let (dict_state, levels) = match &opts.dict {
-        Some(name) => parse_dict(name)?,
-        None => (DictState::Idle, Vec::new()),
-    };
 
     let mut view = View {
         width,
@@ -974,10 +902,6 @@ pub fn run(opts: RenderOpts) -> Result<(), String> {
         caps_on: ctl.mods().caps_lock(),
         handle_anim: anim_pin(&opts),
         ctl: &ctl,
-        #[cfg(feature = "dictation")]
-        dict_state,
-        #[cfg(feature = "dictation")]
-        levels,
     };
     if let Some(label) = &opts.hover {
         place_key_hover(&mut view, label)?;
@@ -1098,10 +1022,38 @@ impl View<'_> {
     pub(crate) fn metrics(&self) -> Metrics {
         Metrics::new(
             self.width.max(0) as f64,
-            self.height.max(0) as f64,
+            (self.height as f64 - self.version_footer_height()).max(0.0),
             self.grid_cols,
             self.layout().rows.len(),
         )
+    }
+
+    fn version_footer_height(&self) -> f64 {
+        // Latino already has a free cell below Scroll Lock. Other layouts
+        // reserve a small footer so the version never covers an injectable key.
+        if self.layout().rows.last().and_then(|r| r.keys.last()).is_some_and(Key::is_gap) {
+            0.0
+        } else {
+            (self.height.max(0) as f64 * 0.06).min(20.0)
+        }
+    }
+
+    pub(crate) fn version_rect(&self) -> Rect {
+        let m = self.metrics();
+        let rows = self.layout().rows;
+        let row = rows.len() - 1;
+        let column = rows[row].keys.len() - 1;
+        if rows[row].keys[column].is_gap() {
+            let (x, y, w, h) = self.key_rect(row, column);
+            let right = (x + w - m.g).min(self.width as f64 - self.handle_size() as f64 - m.g);
+            let width = (m.s * 1.25).clamp(38.0, 70.0).min((right - x - m.g).max(0.0));
+            let height = (m.s * 0.35).clamp(10.0, 18.0).min((h - 2.0 * m.g).max(0.0));
+            return Rect { x: right.max(0.0) - width, y: y + m.g, w: width, h: height };
+        }
+        let right = (self.width as f64 - self.handle_size() as f64 - m.g).max(0.0);
+        let width = (m.s * 1.25).clamp(38.0, 70.0).min(right);
+        let height = (m.s * 0.35).clamp(10.0, 18.0).min(self.height.max(0) as f64);
+        Rect { x: right - width, y: (self.height as f64 - height - 1.0).max(0.0), w: width, h: height }
     }
 
     pub(crate) fn bar_h(&self) -> f64 {
@@ -1153,15 +1105,13 @@ impl View<'_> {
     #[allow(clippy::too_many_lines)]
     pub(crate) fn measure_bar(&self, cr: &Context) -> BarLayout {
         let mut bar = BarLayout {
-            text_left: 0.0,
-            text_right: 0.0,
             layout_rect: Rect::default(),
             theme_rect: Rect::default(),
             close_rect: Rect::default(),
             min_rect: Rect::default(),
+            version_rect: self.version_rect(),
             theme_menu_rect: Rect::default(),
             theme_item_rects: [Rect::default(); MENU_SLOTS],
-            mic_rect: Rect::default(),
             menu_scale: 1.0,
         };
         let m = self.metrics();
@@ -1200,25 +1150,9 @@ impl View<'_> {
             h: bh,
         };
 
-        // 2b. Mic button (dictation), left of the theme icon.
-        #[cfg(feature = "dictation")]
-        let mic_x = {
-            let mic_w = m.icon_w();
-            let mx = th_x - mic_w - chip_gap;
-            bar.mic_rect = Rect {
-                x: mx,
-                y: 0.0,
-                w: mic_w,
-                h: bh,
-            };
-            mx
-        };
 
-        // 3. Layout chip (e.g. "Latino"), left of the mic/theme cluster.
-        #[cfg(not(feature = "dictation"))]
+        // 3. Layout chip (e.g. "Latino"), left of the theme cluster.
         let lo_right = th_x;
-        #[cfg(feature = "dictation")]
-        let lo_right = mic_x;
         let lo_label = self.layout().name;
         let lo_tw = self.text_w(cr, lo_label, chip_fs);
         let lo_w = lo_tw + 2.0 * chip_pad;
@@ -1229,13 +1163,6 @@ impl View<'_> {
             w: lo_w,
             h: bh,
         };
-
-        // The bar's free area, for the dictation waveform:
-        // from the left margin to one gap before the first chip.
-        let text_left = m.margin;
-        let text_right = (lo_x - m.g).max(text_left);
-        bar.text_left = text_left;
-        bar.text_right = text_right;
 
         // 5. Theme dropdown: a 3 x 5 grid of theme cards. The menu always fits inside
         // the window below the bar: if its natural size does not, every
@@ -1323,6 +1250,10 @@ impl View<'_> {
             }
         }
         self.paint_handle(cr);
+        let r = bar.version_rect;
+        let hover = self.inside && r.contains(self.px as f64, self.py as f64);
+        self.draw_centered(cr, crate::update::VERSION, r.x + r.w / 2.0, r.y + r.h / 2.0,
+                           (r.h * 0.7).min(r.w / 4.0), if hover { self.theme.accent } else { self.theme.modtxt });
         // A single hairline around the panel.
         cr.set_operator(Operator::Over);
         cr.new_path();
@@ -1530,11 +1461,6 @@ impl View<'_> {
         cr.rectangle(0.0, 0.0, self.width as f64, bh);
         cr.clip();
         cr.set_operator(Operator::Over);
-        // The bar's free area: the live waveform while dictation records.
-        #[cfg(feature = "dictation")]
-        if self.dict_state == DictState::Recording {
-            self.paint_waveform(cr, bar);
-        }
 
         // Layout chip
         self.paint_chip(
@@ -1569,26 +1495,6 @@ impl View<'_> {
             th_fg,
         );
 
-        // Mic button (dictation), same box treatment. While dictation
-        // is engaged (recording or transcribing) it takes an accent
-        // ring, not a filled accent,
-        // so the waveform, not the button, carries the visual.
-        #[cfg(feature = "dictation")]
-        {
-            let mic_hov = self.inside && bar.mic_rect.contains(self.px as f64, self.py as f64);
-            let armed = self.dict_state != DictState::Idle;
-            let (mic_bg, mic_fg, mic_border) = if armed {
-                (self.theme.on_bg, self.theme.accent, Some(self.theme.accent))
-            } else if mic_hov {
-                (self.theme.key_hov, self.theme.hov_txt, Some(self.theme.edge))
-            } else {
-                (self.theme.key, self.theme.keytxt, Some(self.theme.edge))
-            };
-            self.paint_bar_box(cr, &bar.mic_rect, mic_bg, mic_border);
-            let mic_cx = bar.mic_rect.x + bar.mic_rect.w / 2.0;
-            let mic_cy = bh / 2.0;
-            self.draw_mic_icon(cr, mic_cx, mic_cy, m.s, mic_fg);
-        }
 
         let close_hov = self.inside && bar.close_rect.contains(self.px as f64, self.py as f64);
         // Neutral at rest (the modifier-text tone); the red is
@@ -1613,54 +1519,6 @@ impl View<'_> {
         let _ = cr.restore();
     }
 
-    /// The live waveform while dictation records: [`WAVE_BARS`]
-    /// rounded vertical bars in one tight cluster centered on the
-    /// keyboard's width, in the theme accent, rolling: oldest on the
-    /// left, newest on the right, each finished bar sliding left as
-    /// the next fills. The cluster never reaches the chips: when the
-    /// room either side of the center is too small, the oldest bars
-    /// are dropped first. Heights come from the level (0..1) with a
-    /// minimum stub, so silence still shows a calm centered line.
-    /// Levels are plain data — this never touches cpal.
-    #[cfg(feature = "dictation")]
-    fn paint_waveform(&self, cr: &Context, bar: &BarLayout) {
-        let n = self.levels.len();
-        if n == 0 {
-            return;
-        }
-        let m = self.metrics();
-        let x0 = bar.text_left;
-        let x1 = bar.text_right;
-        let bw = (1.5 * m.g).max(1.0);
-        let gap = 0.6 * m.g;
-        let step = bw + gap;
-        // Centered on the whole keyboard; it may use as much room on
-        // each side of the center as the nearer edge of the free area
-        // allows, so it never runs under the chips.
-        let center = self.width as f64 / 2.0;
-        let room = 2.0 * (center - x0).min(x1 - center).max(0.0);
-        let fit = ((room + gap) / step).floor() as usize;
-        let levels = &self.levels[n - n.min(fit)..];
-        if levels.is_empty() {
-            return;
-        }
-        let width = levels.len() as f64 * step - gap;
-        let left = center - width / 2.0;
-        // The stub keeps silence visible as a calm line rather than a
-        // blank bar.
-        let max_h = m.pill_h;
-        let stub = (0.09 * m.pill_h).max(1.5);
-        let cy = m.bar_h / 2.0;
-        set_src_rgba(cr, self.theme.accent, self.theme.opacity);
-        for (i, &lvl) in levels.iter().enumerate() {
-            let lvl = (lvl as f64).clamp(0.0, 1.0);
-            let h = (stub + lvl * (max_h - stub)).max(stub);
-            let x = left + step * i as f64;
-            cr.new_path();
-            rrect(cr, x, cy - h / 2.0, bw, h, bw / 2.0);
-            let _ = cr.fill();
-        }
-    }
 
     /// The theme button's glyph: a circle split along the ↗↙ diagonal
     /// into the theme's background (upper-left half) and its accent
@@ -1684,24 +1542,6 @@ impl View<'_> {
         let _ = cr.stroke();
     }
 
-    /// A simple microphone glyph: capsule body, holder arc, and stem.
-    #[cfg(feature = "dictation")]
-    fn draw_mic_icon(&self, cr: &Context, cx: f64, cy: f64, s: f64, color: u32) {
-        set_src(cr, color);
-        let w = 0.14 * s;
-        let h = 0.22 * s;
-        let top = cy - 0.17 * s;
-        rrect(cr, cx - w / 2.0, top, w, h, w / 2.0);
-        let _ = cr.fill();
-        cr.new_path();
-        cr.arc(cx, cy - 0.03 * s, 0.13 * s, 0.0, std::f64::consts::PI);
-        cr.set_line_width(0.03 * s);
-        let _ = cr.stroke();
-        cr.new_path();
-        cr.move_to(cx, cy + 0.10 * s);
-        cr.line_to(cx, cy + 0.17 * s);
-        let _ = cr.stroke();
-    }
 
     // One menu canvas: shadow, toggles, and 12 theme cards.
     #[allow(clippy::too_many_lines)]
@@ -2080,6 +1920,10 @@ impl View<'_> {
         let _ = cr.restore();
     }
 }
+
+#[cfg(test)]
+#[path = "../../tools/render_probe.rs"]
+mod perf_validation;
 
 #[cfg(test)]
 mod tests {

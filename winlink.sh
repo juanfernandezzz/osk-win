@@ -11,9 +11,6 @@ ARGS=()
 for arg in "$@"; do
     case "$arg" in
         -lstdc++)     ARGS+=("-l:libc++.a" "-l:libc++abi.a" "-l:libunwind.a") ;;
-        -lggml)      ARGS+=("-l:ggml.a") ;;
-        -lggml-base) ARGS+=("-l:ggml-base.a") ;;
-        -lggml-cpu)  ARGS+=("-l:ggml-cpu.a") ;;
         *)           ARGS+=("$arg") ;;
     esac
 done

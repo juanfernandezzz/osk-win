@@ -3,15 +3,66 @@
 
 use std::os::windows::process::CommandExt;
 use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use windows::core::HSTRING;
 use windows::Win32::UI::WindowsAndMessaging::{
-    MessageBoxW, IDYES, MB_ICONINFORMATION, MB_SETFOREGROUND, MB_TOPMOST, MB_YESNO,
+    MessageBoxW, IDYES, MB_ICONINFORMATION, MB_OK, MB_SETFOREGROUND, MB_TOPMOST, MB_YESNO,
 };
 
 const REPO: &str = "juanfernandezzz/osk-win";
 const INSTALLER: &str = "osk-win-setup.exe";
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
+static CHECKING: AtomicBool = AtomicBool::new(false);
+
+struct CheckGuard<'a>(&'a AtomicBool);
+
+impl<'a> CheckGuard<'a> {
+    fn acquire(flag: &'a AtomicBool) -> Option<Self> {
+        flag.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).ok().map(|_| Self(flag))
+    }
+}
+
+impl Drop for CheckGuard<'_> {
+    fn drop(&mut self) { self.0.store(false, Ordering::Release); }
+}
+
+fn inform(text: &str) {
+    unsafe {
+        MessageBoxW(None, &HSTRING::from(text), &HSTRING::from("osk-win"),
+                    MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND | MB_TOPMOST);
+    }
+}
+
+#[cfg(not(test))]
+pub(crate) fn check_manually() {
+    start_check(true);
+}
+
+#[cfg(test)]
+thread_local! {
+    pub(crate) static MANUAL_CHECKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn check_manually() {
+    MANUAL_CHECKS.with(|count| count.set(count.get() + 1));
+}
+
+fn start_check(manual: bool) {
+    let Some(guard) = CheckGuard::acquire(&CHECKING) else {
+        if manual { inform("Ya se está comprobando una actualización. Espera a que termine."); }
+        return;
+    };
+    std::thread::spawn(move || {
+        let _guard = guard;
+        if let Err(e) = check(manual) {
+            warn!("osk: update check failed: {e}");
+            if manual { inform(&format!("No se pudo comprobar si hay actualizaciones.\n\n{e}")); }
+        }
+    });
+}
 
 /// Check in the background, so a slow or missing network never delays the
 /// keyboard; a failed check only logs. It waits first: starting curl while
@@ -19,9 +70,7 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 pub fn check_at_startup() {
     std::thread::spawn(|| {
         std::thread::sleep(std::time::Duration::from_secs(5));
-        if let Err(e) = check() {
-            warn!("osk: update check failed: {e}");
-        }
+        start_check(false);
     });
 }
 
@@ -46,25 +95,28 @@ fn is_newer(a: &str, b: &str) -> bool {
     nums(a) > nums(b)
 }
 
-fn check() -> Result<(), String> {
+fn available_update(release: &serde_json::Value, current: &str) -> Result<Option<(String, String)>, String> {
+    let tag = release["tag_name"].as_str().ok_or("no tag_name")?.trim_start_matches('v');
+    if !is_newer(tag, current) {
+        return Ok(None);
+    }
+    let prefix = format!("https://github.com/{REPO}/releases/download/");
+    let url = release["assets"].as_array().into_iter().flatten()
+        .find(|a| a["name"] == INSTALLER)
+        .and_then(|a| a["browser_download_url"].as_str())
+        .filter(|u| u.starts_with(&prefix)).ok_or("no installer in the release")?;
+    Ok(Some((tag.to_owned(), url.to_owned())))
+}
+
+fn check(manual: bool) -> Result<(), String> {
     let api = format!("https://api.github.com/repos/{REPO}/releases/latest");
     let release: serde_json::Value =
         serde_json::from_slice(&curl(&["-m", "15", &api])?).map_err(|e| e.to_string())?;
-    let tag = release["tag_name"].as_str().ok_or("no tag_name")?.trim_start_matches('v');
-    let current = env!("CARGO_PKG_VERSION");
-    if !is_newer(tag, current) {
+    let current = VERSION;
+    let Some((tag, url)) = available_update(&release, current)? else {
+        if manual { inform(&format!("osk-win {current} está actualizado. No hay una versión más reciente disponible.")); }
         return Ok(());
-    }
-    // The installer runs with administrator rights: only ever one of this repo's releases.
-    let prefix = format!("https://github.com/{REPO}/releases/download/");
-    let url = release["assets"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|a| a["name"] == INSTALLER)
-        .and_then(|a| a["browser_download_url"].as_str())
-        .filter(|u| u.starts_with(&prefix))
-        .ok_or("no installer in the release")?;
+    };
     let text = format!(
         "Hay una versión nueva de osk-win ({tag}); tienes la {current}.\n\n\
          ¿Descargarla e instalarla ahora? El teclado se cierra durante la instalación."
@@ -81,7 +133,7 @@ fn check() -> Result<(), String> {
         return Ok(());
     }
     let setup = std::env::temp_dir().join(INSTALLER);
-    curl(&["-m", "600", "-o", &setup.to_string_lossy(), url])?;
+    curl(&["-m", "600", "-o", &setup.to_string_lossy(), &url])?;
     // `start` goes through ShellExecute, which raises the UAC prompt the installer needs.
     Command::new("cmd")
         .args(["/C", "start", ""])
@@ -94,7 +146,44 @@ fn check() -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::is_newer;
+    use super::*;
+
+    #[test]
+    fn current_and_older_releases_need_no_installer() {
+        for tag in ["v0.3.0", "0.3.0", "v0.2.9"] {
+            assert_eq!(available_update(&serde_json::json!({"tag_name":tag}), "0.3.0"), Ok(None));
+        }
+    }
+
+    #[test]
+    fn newer_release_selects_the_existing_windows_installer() {
+        let url = format!("https://github.com/{REPO}/releases/download/v0.4.0/{INSTALLER}");
+        let release = serde_json::json!({"tag_name":"v0.4.0", "assets":[
+            {"name":"source.zip", "browser_download_url":"unrelated"},
+            {"name":INSTALLER, "browser_download_url":url}
+        ]});
+        assert_eq!(available_update(&release, "0.3.0"), Ok(Some(("0.4.0".into(), url))));
+    }
+
+    #[test]
+    fn incomplete_release_is_an_error_not_up_to_date() {
+        for release in [serde_json::json!({}), serde_json::json!({"tag_name":"v0.4.0"})] {
+            assert!(available_update(&release, "0.3.0").is_err());
+        }
+    }
+
+    #[test]
+    fn only_one_update_check_runs_and_completion_allows_retry() {
+        let checking = AtomicBool::new(false);
+        let first = CheckGuard::acquire(&checking).unwrap();
+        std::thread::scope(|scope| {
+            for _ in 0..8 {
+                scope.spawn(|| assert!(CheckGuard::acquire(&checking).is_none()));
+            }
+        });
+        drop(first);
+        assert!(CheckGuard::acquire(&checking).is_some());
+    }
 
     #[test]
     fn versions_compare_by_number_not_text() {

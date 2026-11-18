@@ -2,14 +2,21 @@
 
 Usage: python tools/perf_memory.py BASELINE CANDIDATE OUTPUT_DIR
 Reports sampled peaks, not allocation counts or whole desktop UI memory.
+Requires Pillow for decoding and validating the PNG output.
 """
 import ctypes as c
 from ctypes import wintypes as w
 import json
+import hashlib
+import os
+import re
+import platform
 from pathlib import Path
 import subprocess
 import sys
 import time
+import tempfile
+from PIL import Image, __version__ as pillow_version
 
 class Counters(c.Structure):
     _fields_ = [("cb", w.DWORD), ("PageFaultCount", w.DWORD)] + [
@@ -24,10 +31,38 @@ get_gdi = c.WinDLL("user32", use_last_error=True).GetGuiResources
 get_gdi.argtypes = [w.HANDLE, w.DWORD]
 get_gdi.restype = w.DWORD
 
+get_times = c.WinDLL("kernel32", use_last_error=True).GetProcessTimes
+get_times.argtypes = [w.HANDLE] + [c.POINTER(w.FILETIME)] * 4
+get_times.restype = w.BOOL
+
+def image_identity(path, size):
+    with Image.open(path) as image:
+        if image.format != "PNG" or image.size != tuple(map(int, size.split("x"))):
+            raise ValueError(f"Invalid PNG dimensions/format: {path}")
+        image.verify()
+    with Image.open(path) as image:
+        pixels = image.convert("RGBA").tobytes()
+    return {"image_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "pixels_sha256": hashlib.sha256(pixels).hexdigest(), "pixel_bytes": len(pixels)}
+
 def main():
     baseline, candidate, directory = map(Path, sys.argv[1:])
     directory.mkdir(parents=True, exist_ok=True)
     results = []
+    executables = {"baseline": baseline.resolve(), "candidate": candidate.resolve()}
+    env = dict(os.environ, OSK_CONFIG=str((directory / "isolated-config.json").resolve()))
+    for key in ["OSK_THEME", "OSK_LAYOUT"]:
+        env.pop(key, None)
+    report = {"schema": 2, "platform": platform.platform(), "pillow": pillow_version, "sample_interval_ms": 10,
+              "executables": {side: {"path": str(exe), "size": exe.stat().st_size,
+                                     "sha256": hashlib.sha256(exe.read_bytes()).hexdigest()}
+                              for side, exe in executables.items()},
+              "runs": results, "valid": False}
+    report_path = directory / "memory.json"
+    def save():
+        report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    save()
+    expected_images = {}
     for size in ["800x300", "1440x540"]:
         for trial in range(5):
             sides = [("baseline", baseline), ("candidate", candidate)]
@@ -35,29 +70,81 @@ def main():
                 output = directory / f"memory-{side}.png"
                 output.unlink(missing_ok=True)
                 command = [str(exe.resolve()), "--render", str(output.resolve()),
-                           "--size", size, "--menu", "--bench-frames", "1000"]
+                           "--size", size, "--layout", "Latino", "--theme", "default", "--menu", "--bench-frames", "1000"]
                 peak = {"working_set": 0, "private_bytes": 0, "gdi_objects": 0}
                 samples = 0
-                with subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE) as p:
+                attempts = 0
+                errors = []
+                start = time.monotonic()
+                record = dict(side=side, size=size, trial=trial, command=command,
+                              sampling_errors=errors, valid=False)
+                results.append(record)
+                with tempfile.TemporaryFile() as stderr_file, subprocess.Popen(
+                        command, stdout=subprocess.DEVNULL, stderr=stderr_file, env=env) as p:
                     deadline = time.monotonic() + 120
                     while p.poll() is None:
                         if time.monotonic() > deadline:
                             p.kill()
+                            record["error"] = "timeout"
+                            save()
                             raise TimeoutError(command)
+                        attempts += 1
                         counters = Counters(cb=c.sizeof(Counters))
                         # CPython's Windows process handle remains open for this scope.
                         if get_memory(int(p._handle), c.byref(counters), c.sizeof(counters)):
                             samples += 1
                             peak["working_set"] = max(peak["working_set"], counters.WorkingSetSize)
                             peak["private_bytes"] = max(peak["private_bytes"], counters.PrivateUsage)
-                            peak["gdi_objects"] = max(peak["gdi_objects"], get_gdi(int(p._handle), 0))
+                        else:
+                            errors.append({"api": "GetProcessMemoryInfo", "winerror": c.get_last_error(),
+                                           "elapsed_ms": (time.monotonic() - start) * 1000,
+                                           "exited": p.poll() is not None})
+                        c.set_last_error(0)
+                        gdi = get_gdi(int(p._handle), 0)
+                        error = c.get_last_error()
+                        if not gdi and error:
+                            errors.append({"api": "GetGuiResources", "winerror": error,
+                                           "elapsed_ms": (time.monotonic() - start) * 1000,
+                                           "exited": p.poll() is not None})
+                        else:
+                            peak["gdi_objects"] = max(peak["gdi_objects"], gdi)
                         time.sleep(0.01)
-                    stderr = p.stderr.read().decode("utf-8", errors="replace")
-                    if p.returncode or not samples or not output.exists() or "bench: 1000 frames" not in stderr:
+                    stderr_file.seek(0)
+                    stderr = stderr_file.read().decode("utf-8", errors="replace")
+                    record.update(samples=samples, attempts=attempts, returncode=p.returncode,
+                                  stderr=stderr, wall_ms=(time.monotonic() - start) * 1000, **peak)
+                    work = re.search(r"bench: (\d+) frames,", stderr)
+                    record["frames"] = int(work[1]) if work else 0
+                    creation, exit_time, kernel, user = (w.FILETIME() for _ in range(4))
+                    if get_times(int(p._handle), c.byref(creation), c.byref(exit_time), c.byref(kernel), c.byref(user)):
+                        ticks = lambda t: (t.dwHighDateTime << 32) | t.dwLowDateTime
+                        record["cpu_ms"] = (ticks(kernel) + ticks(user)) / 10000
+                    else:
+                        record["cpu_error"] = c.get_last_error()
+                    save()
+                    if p.returncode or not samples or not output.exists() or record["frames"] != 1000:
                         raise RuntimeError(f"Invalid run: {command}\n{stderr}")
-                results.append(dict(side=side, size=size, trial=trial, samples=samples, **peak))
-                print(results[-1], flush=True)
-    (directory / "memory.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+                    try:
+                        record.update(image_identity(output, size))
+                    except Exception as error:
+                        record["error"] = str(error)
+                        save()
+                        raise
+                expected = expected_images.setdefault(size, record["pixels_sha256"])
+                if expected != record["pixels_sha256"]:
+                    record["error"] = "image mismatch"
+                    save()
+                    raise AssertionError(f"Image regression: {size}, {side}, trial {trial}")
+                # A process may exit between poll and sampling. Preserve that error
+                # rather than quietly treating an incomplete sample as a zero.
+                record["valid"] = not any(not e["exited"] for e in errors) and "cpu_error" not in record
+                save()
+                if not record["valid"]:
+                    raise RuntimeError(f"Sampling failed while process was running: {record}")
+                print({k: record[k] for k in ("side", "size", "trial", "samples", "private_bytes", "gdi_objects")}, flush=True)
+    report["valid"] = True
+    report["sampling_error_count"] = sum(len(r["sampling_errors"]) for r in results)
+    save()
 
 if __name__ == "__main__":
     main()

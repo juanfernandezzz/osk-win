@@ -23,7 +23,7 @@ export TARGET="${TARGET:-x86_64-pc-windows-gnu}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER="$SCRIPT_DIR/winlink.sh"
 
-# Cross-compilation tools for cc-rs (used by whisper-rs-sys, etc.)
+# Cross-compilation tools for cc-rs
 export CC_x86_64_pc_windows_gnu="$LM_DIR/bin/x86_64-w64-mingw32-clang"
 export CXX_x86_64_pc_windows_gnu="$LM_DIR/bin/x86_64-w64-mingw32-clang++"
 export AR_x86_64_pc_windows_gnu="$LM_DIR/bin/x86_64-w64-mingw32-llvm-ar"
