@@ -1,0 +1,77 @@
+name: Windows release
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check the tag and the signed helper's sources
+        shell: pwsh
+        run: |
+          $meta = cargo metadata --locked --format-version 1 --no-deps | ConvertFrom-Json
+          $version = ($meta.packages | Where-Object name -eq 'osk-win').version
+          if ($version -notmatch '^\d+\.\d+\.\d+$' -or "v$version" -cne $env:GITHUB_REF_NAME) {
+            throw "Tag does not match the stable workspace version $version"
+          }
+          git diff --exit-code b13d7f0ca83dfcae8057bb47905c8bf083275612 HEAD -- osk-win/src/bin/osk-win-input.rs osk-win/src/backend.rs osk-win/src/vk.rs osk-win/build.rs installer/osk-win-input.cer
+          if ($LASTEXITCODE) { throw 'Provide a newly signed helper for changed helper sources or certificate' }
+
+      - name: Test and build the default Windows app
+        shell: pwsh
+        run: |
+          cargo test --workspace --locked --release
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo build --workspace --locked --release
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Package the keyboard with its original signed UIAccess helper
+        shell: pwsh
+        run: |
+          $previous = Join-Path $env:RUNNER_TEMP 'osk-030-setup.exe'
+          Invoke-WebRequest 'https://github.com/juanfernandezzz/osk-win/releases/download/v0.3.0/osk-win-setup.exe' -OutFile $previous
+          if ((Get-FileHash $previous).Hash -ne 'a0115ed6635afff9e295a0d0dd7ff2a4649683b79d7007044bc19e7f98cfa1e3') { throw 'Unexpected v0.3.0 installer' }
+          $old = Join-Path $env:RUNNER_TEMP 'previous-osk'
+          $process = Start-Process $previous -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /MERGETASKS=!admincert /DIR=`"$old`"" -Wait -PassThru
+          if ($process.ExitCode) { throw "Failed to extract original installation: $($process.ExitCode)" }
+          $helper = Join-Path $old 'osk-win-input.exe'
+          if ((Get-FileHash $helper).Hash -ne '51397024B6D8B9C00853180B29C5F9F8ABCADE1BA001B4736B67301553A114E1') { throw 'Unexpected v0.3.0 helper' }
+          $innoSetup = Join-Path $env:RUNNER_TEMP 'innosetup-6.4.3.exe'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_4_3/innosetup-6.4.3.exe' -OutFile $innoSetup
+          if ((Get-FileHash $innoSetup).Hash -ne 'f3c42116542c4cc57263c5ba6c4feabfc49fe771f2f98a79d2f7628b8762723b') { throw 'Unexpected Inno Setup compiler package' }
+          $inno = Join-Path $env:RUNNER_TEMP 'iscc'
+          $process = Start-Process $innoSetup -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR=`"$inno`"" -Wait -PassThru
+          if ($process.ExitCode) { throw "Compiler installation failed: $($process.ExitCode)" }
+          $compiler = Join-Path $inno 'ISCC.exe'
+          ./installer/package.ps1 -BinaryDir target/release -SignedHelper $helper -OutputDir dist -Compiler $compiler
+          Copy-Item target/release/osk-win.exe dist/
+
+      - name: Publish both verified assets together
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $draft = gh release view $tag --json isDraft --jq .isDraft 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --draft --verify-tag --title "osk-win $tag" --generate-notes
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          } elseif ($draft -ne 'true') { throw "$tag is already published" }
+          gh release upload $tag dist/osk-win-setup.exe dist/osk-win.exe --clobber
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $assets = (gh release view $tag --json assets | ConvertFrom-Json).assets
+          foreach ($name in 'osk-win-setup.exe','osk-win.exe') {
+            $hash = (Get-FileHash (Join-Path 'dist' $name)).Hash
+            if (($assets | Where-Object name -eq $name).digest -ne "sha256:$hash") { throw "Release digest mismatch: $name" }
+          }
+          gh release edit $tag --draft=false --latest
+          exit $LASTEXITCODE

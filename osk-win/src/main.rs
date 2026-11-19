@@ -34,7 +34,7 @@ use osk_core::typekey::{type_text, CharMap};
 use backend::{Backend, BackendSink, SendInputBackend};
 
 #[derive(Parser)]
-#[command(name = "osk-win", about = "On-screen keyboard for Windows")]
+#[command(name = "osk-win", version, about = "On-screen keyboard for Windows")]
 // Independent CLI flags; grouping them would change the interface.
 #[allow(clippy::struct_excessive_bools)]
 struct Args {
