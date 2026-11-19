@@ -160,6 +160,27 @@ Private bytes are sampled process peaks. CPU is total user plus kernel time for 
 | 1440x540 private_bytes | 24,092,672.00 [23,969,792.00–26,480,640.00] | 22,749,184.00 [22,376,448.00–26,091,520.00] |
 | 1440x540 gdi_objects | 2.00 [2.00–2.00] | 2.00 [2.00–2.00] |
 
-The final release test suite passed 68 tests, with one explicit performance probe run separately. The Python measurement harness passed nine tests. A running installed instance prevented simultaneous live GUI testing.
+The final release test suite passed 68 tests, with one explicit performance probe run separately. The Python measurement harness passed nine tests.
 
-Measured hot paint excludes input delivery, window presentation and model loading. The allocation experiment supports the narrower path-buffer improvement. Desktop typing latency still requires live validation.
+### Native desktop smoke test
+
+The final default executable ran on the Windows desktop with an isolated config
+and the Latino layout at a client size of 783 × 250. The startup check left the
+keyboard open without a dialog. The project's `oskwin-verify click` then sent
+a native mouse click on the version label. The test located its painted bounds
+by comparing ordinary and hovered renders at the live client size and checked
+that the screen point belonged to the test keyboard. The window capture tool
+timed out, so the dialog text was read from Windows accessibility:
+
+> osk-win 0.3.0 está actualizado. No hay una versión más reciente disponible.
+
+Accepting the notice dismissed it. With `oskwin-verify recv` confirmed as
+the foreground process, clicking the painted A key delivered `keydown vk=41`
+and `char 0x61 'a'` to that receiver. The test process closed normally and
+the installed keyboard was reopened and verified by its executable path.
+
+This verifies the current-release dialog and ordinary desktop text delivery.
+The newer-release branch was covered using fixture release metadata. The live
+feed offered no newer installer. Click-to-character latency, delivery to an
+elevated application and installation of a newer release were not measured
+in this smoke test.
