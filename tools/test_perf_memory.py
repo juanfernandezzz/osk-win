@@ -24,7 +24,7 @@ class MemoryHarnessTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 perf.image_identity(path, "2x3")
 
-    def exercise(self, *, frames=1000, memory_ok=1, mismatch=False, references=False):
+    def exercise(self, *, frames=1000, memory_ok=1, mismatch=False, references=False, gdi_failures=0):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
             baseline, candidate = directory / "a.exe", directory / "b.exe"
@@ -41,6 +41,7 @@ class MemoryHarnessTests(unittest.TestCase):
                     self._handle = 1
                     self.returncode = None
                     self.polls = 0
+                    self.fail_gdi = gdi_failures > 0
                     size = tuple(map(int, command[4].split("x")))
                     color = "red" if mismatch and Path(command[0]).name == "b.exe" else "blue"
                     Image.new("RGB", size, color).save(command[2])
@@ -49,14 +50,21 @@ class MemoryHarnessTests(unittest.TestCase):
                 def __exit__(self, *args): pass
                 def poll(self):
                     self.polls += 1
-                    if self.polls > 1: self.returncode = 0
+                    if self.polls > (2 if self.fail_gdi else 1): self.returncode = 0
                     return self.returncode
+            def get_gdi(handle, kind):
+                nonlocal gdi_failures
+                if gdi_failures:
+                    gdi_failures -= 1
+                    perf.c.set_last_error(87)
+                    return 0
+                return 2
             error = None
             with patch.object(perf.sys, "argv", args), \
                  patch.object(perf.platform, "platform", return_value="test platform"), \
                  patch.object(perf.subprocess, "Popen", Process), \
                  patch.object(perf, "get_memory", return_value=memory_ok), \
-                 patch.object(perf, "get_gdi", return_value=2), \
+                 patch.object(perf, "get_gdi", side_effect=get_gdi), \
                  patch.object(perf, "get_times", return_value=1), \
                  patch.object(perf.time, "sleep"), contextlib.redirect_stdout(io.StringIO()):
                 try:
@@ -90,6 +98,37 @@ class MemoryHarnessTests(unittest.TestCase):
         self.assertIsNotNone(error)
         self.assertFalse(report["valid"])
         self.assertEqual(report["runs"][-1]["error"], "image mismatch")
+
+    def test_live_gdi_failure_preserves_and_repeats_both_sides(self):
+        report, error = self.exercise(gdi_failures=1)
+        self.assertIsNone(error)
+        self.assertEqual(len(report["runs"]), 20)
+        (excluded,) = report["excluded_pairs"]
+        self.assertEqual([r["valid"] for r in excluded], [False, True])
+        self.assertEqual(excluded[0]["sampling_errors"][0]["winerror"], 87)
+        self.assertFalse(excluded[0]["sampling_errors"][0]["exited"])
+        self.assertEqual(report["sampling_error_count"], 1)
+        self.assertEqual([(r["side"], r["trial"], r["pair_attempt"]) for r in report["runs"][:2]],
+                         [("baseline", 0, 2), ("candidate", 0, 2)])
+
+    def test_persistent_gdi_failure_stops_with_all_pairs_preserved(self):
+        report, error = self.exercise(gdi_failures=6)
+        self.assertIsNotNone(error)
+        self.assertFalse(report["valid"])
+        self.assertEqual(report["runs"], [])
+        self.assertEqual(len(report["excluded_pairs"]), 3)
+
+    def test_post_render_gdi_error_requires_an_observed_peak_and_prior_completion(self):
+        log = b"bench: 1000 frames, frame median 1 ms\nosk: wrote frame.png\n"
+        error = {"api": "GetGuiResources", "winerror": 87, "stderr_bytes_before_sample": len(log)}
+        self.assertTrue(perf.gdi_after_final_output(error, log, 2))
+        self.assertFalse(perf.gdi_after_final_output(error, log, 0))
+        for change in ({"stderr_bytes_before_sample": len(log) - 1},
+                       {"api": "GetProcessMemoryInfo"}, {"winerror": 5}):
+            self.assertFalse(perf.gdi_after_final_output({**error, **change}, log, 2))
+        for incomplete in (b"bench: 1000 frames\n", log[:-1], b""):
+            self.assertFalse(perf.gdi_after_final_output(
+                {**error, "stderr_bytes_before_sample": len(incomplete)}, incomplete, 2))
 
     def test_intentional_visual_change_checks_each_reference(self):
         report, error = self.exercise(mismatch=True, references=True)
