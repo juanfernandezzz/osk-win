@@ -624,11 +624,10 @@ impl State {
 
     /// Measure the bar and paint the view into `surface`.
     fn draw(&mut self, surface: &ImageSurface) -> Option<BarLayout> {
-        let meas = Context::new(surface).ok()?;
-        meas.select_font_face(FONT, FontSlant::Normal, FontWeight::Normal);
-        let bar = self.view().measure_bar(&meas);
-        drop(meas);
+        // One context: paint resets the matrix, clip and font before drawing.
         let cr = Context::new(surface).ok()?;
+        cr.select_font_face(FONT, FontSlant::Normal, FontWeight::Normal);
+        let bar = self.view().measure_bar(&cr);
         // Out of self while the view borrows it.
         let mut cache = self.key_cache.take();
         let view = self.view();

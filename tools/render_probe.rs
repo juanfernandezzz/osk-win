@@ -124,3 +124,105 @@ fn probe_cold_rebuild_hot() {
     }
     println!("probe: {}", serde_json::to_string(&results).unwrap());
 }
+
+
+#[test]
+fn toolbar_revisits_match_a_new_surface() {
+    let ctl = Controller::new();
+    let output = std::env::var_os("OSK_BAR_SEQUENCE_OUT").map(PathBuf::from);
+    if let Some(dir) = &output { std::fs::create_dir_all(dir).unwrap(); }
+    for (case, (w, h, bw, bh)) in [(1, 1, 1, 1), (7, 5, 11, 8), (201, 181, 251, 226),
+                                   (721, 341, 1082, 512), (800, 300, 800, 300)].into_iter().enumerate() {
+        let mut v = view(&ctl, w, h);
+        v.buf_w = bw;
+        v.buf_h = bh;
+        let surface = ImageSurface::create(Format::ARgb32, bw, bh).unwrap();
+        let mut cache = None;
+        for (step, target) in ["theme", "layout", "min", "close", "version", "outside", "key",
+                               "theme", "close", "min", "outside", "layout", "theme"].into_iter().enumerate() {
+            v.theme_menu_open = (3..9).contains(&step);
+            let cr = Context::new(&surface).unwrap();
+            let bar = v.measure_bar(&cr);
+            v.inside = target != "outside";
+            if let Some(r) = bar_hover_target(&bar, target) {
+                v.px = (r.x + r.w / 2.0) as i32;
+                v.py = (r.y + r.h / 2.0) as i32;
+            } else {
+                v.px = w / 3;
+                v.py = h / 2;
+            }
+            frame(&v, &surface, &mut cache);
+            let fresh = ImageSurface::create(Format::ARgb32, bw, bh).unwrap();
+            frame(&v, &fresh, &mut None);
+            let image = png(&surface);
+            assert!(image == png(&fresh), "toolbar case {case}, step {step}, {target}");
+            if let Some(dir) = &output {
+                std::fs::write(dir.join(format!("{case}-{step:02}.png")), image).unwrap();
+            }
+        }
+    }
+}
+
+
+
+#[test]
+fn source_copy_preserves_pixels_outside_the_source() {
+    for (src_h, dst_h) in [(2, 5), (5, 2), (3, 3)] {
+        let solid = |height, rgba: [f64; 4]| {
+            let s = ImageSurface::create_offscreen(Format::ARgb32, 3, height).unwrap();
+            let cr = Context::new(&s).unwrap();
+            cr.set_operator(Operator::Source);
+            cr.set_source_rgba(rgba[0], rgba[1], rgba[2], rgba[3]);
+            cr.paint().unwrap();
+            s
+        };
+        let src = solid(src_h, [0.0, 1.0, 0.0, 0.5]);
+        let dst = solid(dst_h, [1.0, 0.0, 0.0, 1.0]);
+        let expected = solid(dst_h, [1.0, 0.0, 0.0, 1.0]);
+        let cr = Context::new(&dst).unwrap();
+        cr.set_operator(Operator::Source);
+        cr.set_source_surface(&src, 0.0, 0.0).unwrap();
+        cr.paint().unwrap();
+        let oracle = Context::new(&expected).unwrap();
+        oracle.set_operator(Operator::Source);
+        oracle.set_source_rgba(0.0, 1.0, 0.0, 0.5);
+        oracle.rectangle(0.0, 0.0, 3.0, src_h.min(dst_h) as f64);
+        oracle.fill().unwrap();
+        assert_eq!(png(&dst), png(&expected));
+    }
+}
+
+
+#[test]
+fn clipped_colored_glyphs_match_inside_a_larger_surface() {
+    for (i, (bold, x, y)) in [(false, -6.0, 11.0), (true, 23.0, 6.0), (false, 0.0, -2.0), (true, 10.0, 20.0)].into_iter().enumerate() {
+        let draw = |size, shift: f64| {
+            let s = ImageSurface::create_offscreen(Format::ARgb32, size, size).unwrap();
+            let cr = Context::new(&s).unwrap();
+            cr.set_operator(Operator::Source);
+            cr.set_source_rgba(0.25, 0.5, 0.125, 0.6);
+            cr.paint().unwrap();
+            cr.rectangle(shift + 1.0, shift + 1.0, 28.0, 16.0);
+            cr.clip();
+            cr.select_font_face(FONT, FontSlant::Normal, if bold { FontWeight::Bold } else { FontWeight::Normal });
+            cr.set_font_size(13.25);
+            cr.set_source_rgba(0.85, 0.2, 0.7, 0.65);
+            cr.move_to(shift + x, shift + y);
+            cr.show_text("ÁgW").unwrap();
+            png(&s)
+        };
+        let small = draw(32, 0.0);
+        let large = draw(64, 16.0);
+        let small_pixels = tiny_skia::Pixmap::decode_png(&small).unwrap();
+        let large_pixels = tiny_skia::Pixmap::decode_png(&large).unwrap();
+        for yy in 0..32 {
+            for xx in 0..32 {
+                assert_eq!(small_pixels.pixel(xx, yy), large_pixels.pixel(xx + 16, yy + 16));
+            }
+        }
+        if let Some(dir) = std::env::var_os("OSK_TEXT_SEQUENCE_OUT").map(PathBuf::from) {
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join(format!("{i}.png")), small).unwrap();
+        }
+    }
+}

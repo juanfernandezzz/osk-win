@@ -557,9 +557,15 @@ pub(crate) struct CacheKey {
 /// The case and every key at rest, drawn once into a buffer-sized
 /// surface. A frame copies it and redraws only the keys whose look
 /// differs, so a keystroke repaints one key instead of all of them.
+/// `surface` stays the pristine case. `strip` holds the raw top rows of a frame
+/// right after the toolbar was painted on the full canvas, refreshed only when
+/// `bar_sig` (see [`View::bar_sig`]) changes. No strip means cairo could not
+/// make one: the bar is painted directly.
 pub(crate) struct KeyCache {
     key: CacheKey,
     surface: ImageSurface,
+    strip: Option<ImageSurface>,
+    bar_sig: Option<(bool, [bool; 4])>,
 }
 
 /// The layout at `idx` of [`ALL_LAYOUTS`]: one lookup shared by the
@@ -958,12 +964,10 @@ fn bench_frames(
     let mut measure = Vec::with_capacity(n);
     for _ in 0..n {
         let t0 = Instant::now();
-        let meas = Context::new(surface).map_err(|e| format!("cairo: {e}"))?;
-        meas.select_font_face(FONT, FontSlant::Normal, FontWeight::Normal);
-        let bar = view.measure_bar(&meas);
-        drop(meas);
-        let t1 = Instant::now();
         let cr = Context::new(surface).map_err(|e| format!("cairo: {e}"))?;
+        cr.select_font_face(FONT, FontSlant::Normal, FontWeight::Normal);
+        let bar = view.measure_bar(&cr);
+        let t1 = Instant::now();
         view.paint(&cr, &bar, cache);
         drop(cr);
         surface.flush();
@@ -1233,18 +1237,34 @@ impl View<'_> {
         if cache.as_ref().map(|c| &c.key) != Some(&key) {
             *cache = self.build_cache(key);
         }
-        if let Some(c) = cache.as_ref() {
+        let mut bar_done = false;
+        let sig = self.bar_sig(bar);
+        if let Some(c) = cache.as_mut() {
             // A straight pixel copy of the case and every key at rest.
             cr.set_operator(Operator::Source);
             let _ = cr.set_source_surface(&c.surface, 0.0, 0.0);
             let _ = cr.paint();
+            if let Some(strip) = c.strip.as_ref().filter(|_| c.bar_sig == Some(sig)) {
+                // Raw rows of the toolbar exactly as painted on the full canvas.
+                cr.target().copy_top_from(strip);
+                bar_done = true;
+            }
         }
         self.scale_to_logical(cr);
         cr.select_font_face(FONT, FontSlant::Normal, FontWeight::Normal);
         if cache.is_none() {
             self.paint_rest(cr);
         }
-        self.paint_bar(cr, bar);
+        if !bar_done {
+            self.paint_bar(cr, bar);
+            // Keep the finished rows before live key overlays touch them.
+            if let Some(c) = cache.as_mut() {
+                if let Some(strip) = c.strip.as_ref() {
+                    strip.copy_top_from(cr.target());
+                    c.bar_sig = Some(sig);
+                }
+            }
+        }
         let layout = self.layout();
         for (r, row) in layout.rows.iter().enumerate() {
             for (i, key) in row.keys.iter().enumerate() {
@@ -1334,6 +1354,16 @@ impl View<'_> {
         }
     }
 
+    /// What the toolbar's look depends on beyond [`CacheKey`]: menu open and
+    /// whether the pointer is on the layout, theme, close or minimize control.
+    fn bar_sig(&self, bar: &BarLayout) -> (bool, [bool; 4]) {
+        let hit = |r: &Rect| self.inside && r.contains(self.px as f64, self.py as f64);
+        (
+            self.theme_menu_open,
+            [&bar.layout_rect, &bar.theme_rect, &bar.close_rect, &bar.min_rect].map(hit),
+        )
+    }
+
     /// Draw the at-rest keyboard into a fresh offscreen surface; None
     /// when cairo cannot make one, and the frame draws it directly.
     fn build_cache(&self, key: CacheKey) -> Option<KeyCache> {
@@ -1343,24 +1373,22 @@ impl View<'_> {
         cr.select_font_face(FONT, FontSlant::Normal, FontWeight::Normal);
         self.paint_rest(&cr);
         drop(cr);
-        Some(KeyCache { key, surface })
+        // The bar's device rows (+1 for antialiased edges).
+        let sy = if self.height > 0 { self.buf_h as f64 / self.height as f64 } else { 1.0 };
+        let rows = ((self.metrics().bar_h * sy).ceil() as i32 + 1).clamp(1, self.buf_h.max(1));
+        let strip = ImageSurface::create_offscreen(Format::ARgb32, self.buf_w, rows).ok();
+        Some(KeyCache { key, surface, strip, bar_sig: None })
     }
 
     fn paint_window(&self, cr: &Context) {
         cr.set_operator(Operator::Source);
-        cr.set_source_rgba(0.0, 0.0, 0.0, 0.0);
+        if self.width > 0 && self.height > 0 {
+            // Solid case over the whole surface; nothing to clear first.
+            set_src_rgba(cr, self.theme.case, self.theme.opacity);
+        } else {
+            cr.set_source_rgba(0.0, 0.0, 0.0, 0.0);
+        }
         let _ = cr.paint();
-        cr.set_operator(Operator::Over);
-        set_src_rgba(cr, self.theme.case, self.theme.opacity);
-        rrect(
-            cr,
-            0.0,
-            0.0,
-            self.width as f64,
-            self.height as f64,
-            0.0,
-        );
-        let _ = cr.fill();
     }
 
     fn draw_centered(&self, cr: &Context, s: &str, cx: f64, cy: f64, size: f64, color: u32) {
@@ -1464,10 +1492,6 @@ impl View<'_> {
         // Pills and chips sit inside the corner radius, so the rest of
         // the bar keeps only the cheap rectangular clip; a rounded clip
         // makes cairo composite every later op through a mask.
-        let _ = cr.restore();
-        let _ = cr.save();
-        cr.rectangle(0.0, 0.0, self.width as f64, bh);
-        cr.clip();
         cr.set_operator(Operator::Over);
 
         // Layout chip
@@ -1700,19 +1724,21 @@ impl View<'_> {
     /// What this frame's pointer, interaction and modifiers do to the
     /// look of key `idx` drawn at the given cell.
     fn key_state(&self, key: &Key, idx: usize, rx: f64, ry: f64, rw: f64, rh: f64) -> KeyState {
-        let (pressed, press_time, repeating) = match self.interaction {
+        let (pressed, held) = match self.interaction {
             Interaction::Press {
                 key,
                 press_time,
                 rep_next,
                 ..
-            } if self.same_key(key, idx) => (true, press_time, rep_next.is_some()),
+            } if self.same_key(key, idx) => (
+                true,
+                rep_next.is_some() || now_ms().saturating_sub(press_time) >= interaction::HOLD_MS,
+            ),
             Interaction::Press { .. }
             | Interaction::Idle
             | Interaction::Move { .. }
-            | Interaction::Resize { .. } => (false, 0, false),
+            | Interaction::Resize { .. } => (false, false),
         };
-        let held = repeating || now_ms().saturating_sub(press_time) >= interaction::HOLD_MS;
         KeyState {
             vis: if self.fn_on && key.code_u16() == key::KEY_FN {
                 ModKeyState::Latched

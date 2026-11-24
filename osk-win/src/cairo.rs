@@ -17,7 +17,7 @@ use std::sync::LazyLock;
 
 use fontdue::{Font, FontSettings};
 use tiny_skia::{
-    BlendMode, Color, FillRule, FilterQuality, LineCap as SkiaLineCap, LineJoin,
+    BlendMode, Color, FillRule, FilterQuality, LineJoin,
     Mask, Paint, PathBuilder, Pixmap, PixmapPaint, Rect, Stroke, Transform,
 };
 
@@ -146,11 +146,7 @@ pub enum Operator {
     Over,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum LineCap {
-    Butt,
-    Round,
-}
+pub use tiny_skia::LineCap;
 
 #[derive(Clone, Copy, Debug)]
 pub struct TextExtents {
@@ -288,6 +284,17 @@ impl ImageSurface {
         unsafe { BitBlt(hdc, 0, 0, self.0.w, self.0.h, self.0.dc, 0, 0, SRCCOPY) };
     }
 
+    /// Raw-copy the rows `src` shares with this surface (same width, no blending).
+    pub fn copy_top_from(&self, src: &ImageSurface) {
+        if Rc::ptr_eq(&self.0, &src.0) || self.0.w != src.0.w {
+            return;
+        }
+        let src = src.0.pixmap.borrow();
+        let mut dst = self.0.pixmap.borrow_mut();
+        let n = dst.data().len().min(src.data().len());
+        dst.data_mut()[..n].copy_from_slice(&src.data()[..n]);
+    }
+
     pub fn write_to_png<W: Write>(&self, out: &mut W) -> Result<(), Error> {
         let pm = self.0.pixmap.borrow();
         let png = pm.encode_png().map_err(|_| Error)?;
@@ -300,7 +307,7 @@ struct Gstate {
     color: Color,
     line_width: f32,
     line_cap: LineCap,
-    operator: Operator,
+    blend: BlendMode,
     transform: Transform,
     font_size: f32,
     bold: bool,
@@ -329,7 +336,7 @@ impl Context {
                     color: Color::from_rgba8(0, 0, 0, 255),
                     line_width: 2.0,
                     line_cap: LineCap::Butt,
-                    operator: Operator::Over,
+                    blend: BlendMode::SourceOver,
                     transform: Transform::identity(),
                     font_size: 10.0,
                     bold: false,
@@ -341,6 +348,10 @@ impl Context {
                 cur: None,
             }),
         })
+    }
+
+    pub fn target(&self) -> &ImageSurface {
+        &self.surface
     }
 
     pub fn save(&self) -> Result<(), Error> {
@@ -368,7 +379,10 @@ impl Context {
     }
 
     pub fn set_operator(&self, op: Operator) {
-        self.st.borrow_mut().g.operator = op;
+        self.st.borrow_mut().g.blend = match op {
+            Operator::Source => BlendMode::Source,
+            Operator::Over => BlendMode::SourceOver,
+        };
     }
 
     pub fn set_source_rgba(&self, r: f64, g: f64, b: f64, a: f64) {
@@ -422,14 +436,9 @@ impl Context {
         while a2 < a1 {
             a2 += 2.0 * PI;
         }
-        let p0x = cx + r * a1.cos();
-        let p0y = cy + r * a1.sin();
-        let had_cur = self.st.borrow().cur.is_some();
-        if had_cur {
-            self.line_to(p0x, p0y);
-        } else {
-            self.move_to(p0x, p0y);
-        }
+        // line_to starts the subpath itself when there is no current point.
+        let (mut sin1, mut cos1) = a1.sin_cos();
+        self.line_to(cx + r * cos1, cy + r * sin1);
 
         let mut cur_angle = a1;
         while cur_angle < a2 {
@@ -437,10 +446,7 @@ impl Context {
             let next_angle = cur_angle + sweep;
             let k = 4.0 / 3.0 * (sweep / 4.0).tan();
 
-            let cos1 = cur_angle.cos();
-            let sin1 = cur_angle.sin();
-            let cos2 = next_angle.cos();
-            let sin2 = next_angle.sin();
+            let (sin2, cos2) = next_angle.sin_cos();
 
             let cp0x = cx + r * cos1;
             let cp0y = cy + r * sin1;
@@ -458,6 +464,7 @@ impl Context {
                 p3x as f32, p3y as f32,
             );
             cur_angle = next_angle;
+            (sin1, cos1) = (sin2, cos2);
         }
         self.st.borrow_mut().cur = Some((cx + r * a2.cos(), cy + r * a2.sin()));
     }
@@ -484,10 +491,7 @@ impl Context {
         };
         let mut paint = Paint::default();
         paint.set_color(st.g.color);
-        paint.blend_mode = match st.g.operator {
-            Operator::Source => BlendMode::Source,
-            Operator::Over => BlendMode::SourceOver,
-        };
+        paint.blend_mode = st.g.blend;
         paint.anti_alias = true;
         let mut pm = self.surface.0.pixmap.borrow_mut();
         pm.fill_path(
@@ -510,18 +514,12 @@ impl Context {
         };
         let mut paint = Paint::default();
         paint.set_color(st.g.color);
-        paint.blend_mode = match st.g.operator {
-            Operator::Source => BlendMode::Source,
-            Operator::Over => BlendMode::SourceOver,
-        };
+        paint.blend_mode = st.g.blend;
         paint.anti_alias = true;
         let stroke = Stroke {
             width: st.g.line_width,
             miter_limit: 4.0,
-            line_cap: match st.g.line_cap {
-                LineCap::Butt => SkiaLineCap::Butt,
-                LineCap::Round => SkiaLineCap::Round,
-            },
+            line_cap: st.g.line_cap,
             line_join: LineJoin::Round,
             dash: None,
         };
@@ -568,18 +566,15 @@ impl Context {
         let mut st = self.st.borrow_mut();
         let (w, h) = (self.surface.0.w as u32, self.surface.0.h as u32);
         if let Some(src) = st.g.source_surface.take() {
-            let src_pm = src.0.pixmap.borrow();
-            let mut pm = self.surface.0.pixmap.borrow_mut();
-            if st.g.transform.is_identity() && st.g.clip_mask.is_none() && st.g.operator == Operator::Source && pm.width() == src_pm.width() && pm.height() == src_pm.height() {
-                pm.data_mut().copy_from_slice(src_pm.data());
+            if st.g.transform.is_identity() && st.g.clip_mask.is_none() && st.g.blend == BlendMode::Source && self.surface.0.w == src.0.w {
+                self.surface.copy_top_from(&src);
                 return Ok(());
             }
+            let src_pm = src.0.pixmap.borrow();
+            let mut pm = self.surface.0.pixmap.borrow_mut();
             let paint = PixmapPaint {
                 opacity: 1.0,
-                blend_mode: match st.g.operator {
-                    Operator::Source => BlendMode::Source,
-                    Operator::Over => BlendMode::SourceOver,
-                },
+                blend_mode: st.g.blend,
                 quality: FilterQuality::Nearest,
             };
             pm.draw_pixmap(0, 0, src_pm.as_ref(), &paint, st.g.transform, st.g.clip_mask.as_ref());
@@ -591,10 +586,7 @@ impl Context {
         };
         let mut paint = Paint::default();
         paint.set_color(st.g.color);
-        paint.blend_mode = match st.g.operator {
-            Operator::Source => BlendMode::Source,
-            Operator::Over => BlendMode::SourceOver,
-        };
+        paint.blend_mode = st.g.blend;
         paint.anti_alias = false;
         let mut pm = self.surface.0.pixmap.borrow_mut();
         pm.fill_rect(rect, &paint, Transform::identity(), st.g.clip_mask.as_ref());
@@ -640,72 +632,44 @@ impl Context {
         let base_y = pt.y;
         let px_size = st.g.font_size * st.g.transform.sy;
         let mut pm = self.surface.0.pixmap.borrow_mut();
-        let pw = pm.width() as i32;
-        let ph = pm.height() as i32;
+        let (pw, ph) = (pm.width() as i64, pm.height() as i64);
         let color = st.g.color;
-        let base_r = color.red();
-        let base_g = color.green();
-        let base_b = color.blue();
-        let base_a = color.alpha();
+        let src = [color.red(), color.green(), color.blue(), 1.0];
+        let data = pm.data_mut();
 
         GLYPHS.with(|cache| {
             let mut cache = cache.borrow_mut();
             for ch in s.chars() {
                 cache.with_glyph(ch, px_size, |metrics, bitmap| {
-                    let gx = (base_x + metrics.xmin as f32).round() as i32;
-                    let gy = (base_y - (metrics.ymin + metrics.height as i32) as f32).round() as i32;
+                    let gx = i64::from((base_x + metrics.xmin as f32).round() as i32);
+                    let gy = i64::from((base_y - (metrics.ymin + metrics.height as i32) as f32).round() as i32);
+                    let (gw, gh) = (metrics.width as i64, metrics.height as i64);
+                    // Visible glyph rows; columns are clipped per pass below.
+                    let (ly0, ly1) = ((-gy).max(0), gh.min(ph - gy));
 
-                    let gw = metrics.width as i32;
-                    let gh = metrics.height as i32;
-
-                    let passes = if st.g.bold { 2 } else { 1 };
-                    for pass in 0..passes {
-                        let offset_x = if pass == 1 { 1 } else { 0 };
-                        for ly in 0..gh {
-                            let py = gy + ly;
-                            if py < 0 || py >= ph {
-                                continue;
-                            }
-                            for lx in 0..gw {
-                                let px = gx + lx + offset_x;
-                                if px < 0 || px >= pw {
-                                    continue;
-                                }
+                    for pass in 0..1 + st.g.bold as i64 {
+                        let x0 = gx + pass;
+                        let (lx0, lx1) = ((-x0).max(0), gw.min(pw - x0));
+                        for ly in ly0..ly1 {
+                            let row = (gy + ly) * pw + x0;
+                            for lx in lx0..lx1 {
                                 let cov = bitmap[(ly * gw + lx) as usize];
                                 if cov == 0 {
                                     continue;
                                 }
-                                let mut alpha_f = (cov as f32 / 255.0) * base_a;
+                                let idx = (row + lx) as usize;
+                                let mut alpha_f = (cov as f32 / 255.0) * color.alpha();
                                 if let Some(ref mask) = st.g.clip_mask {
-                                    let mask_cov = mask.data()[(py * pw + px) as usize];
+                                    let mask_cov = mask.data()[idx];
                                     if mask_cov == 0 {
                                         continue;
                                     }
                                     alpha_f *= mask_cov as f32 / 255.0;
                                 }
-
-                                let p_idx = ((py * pw + px) * 4) as usize;
-                                let data = pm.data_mut();
-                                let dst_r = data[p_idx] as f32 / 255.0;
-                                let dst_g = data[p_idx + 1] as f32 / 255.0;
-                                let dst_b = data[p_idx + 2] as f32 / 255.0;
-                                let dst_a = data[p_idx + 3] as f32 / 255.0;
-
-                                let src_r = base_r * alpha_f;
-                                let src_g = base_g * alpha_f;
-                                let src_b = base_b * alpha_f;
-                                let src_a = alpha_f;
-
-                                let inv_a = 1.0 - src_a;
-                                let out_r = ((src_r + dst_r * inv_a).clamp(0.0, 1.0) * 255.0).round() as u8;
-                                let out_g = ((src_g + dst_g * inv_a).clamp(0.0, 1.0) * 255.0).round() as u8;
-                                let out_b = ((src_b + dst_b * inv_a).clamp(0.0, 1.0) * 255.0).round() as u8;
-                                let out_a = ((src_a + dst_a * inv_a).clamp(0.0, 1.0) * 255.0).round() as u8;
-
-                                data[p_idx] = out_r;
-                                data[p_idx + 1] = out_g;
-                                data[p_idx + 2] = out_b;
-                                data[p_idx + 3] = out_a;
+                                let inv_a = 1.0 - alpha_f;
+                                for (d, s) in data[idx * 4..idx * 4 + 4].iter_mut().zip(src) {
+                                    *d = ((s * alpha_f + *d as f32 / 255.0 * inv_a).clamp(0.0, 1.0) * 255.0).round() as u8;
+                                }
                             }
                         }
                     }
