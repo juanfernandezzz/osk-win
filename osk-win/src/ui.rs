@@ -35,9 +35,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER, SW_SHOWNOACTIVATE, WM_DESTROY, WM_ERASEBKGND,
     WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_PAINT,
     WM_SETCURSOR, WM_SIZE, WM_TIMER, WNDCLASSEXW, WS_EX_APPWINDOW, WS_EX_NOACTIVATE,
-    WS_EX_TOPMOST, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, FindWindowW, SW_SHOWMINNOACTIVE, SetForegroundWindow, GetForegroundWindow, WA_INACTIVE, WM_ACTIVATE,
+    WS_EX_TOPMOST, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, FindWindowW, SetForegroundWindow, GetForegroundWindow, IsIconic, IsWindowVisible,
     GetWindow, GW_HWNDPREV, HWND_TOPMOST, SWP_NOMOVE, KBDLLHOOKSTRUCT, WH_KEYBOARD_LL, WM_KEYDOWN,
-    WM_SYSKEYDOWN, LLKHF_EXTENDED, EVENT_SYSTEM_FOREGROUND, WINEVENT_OUTOFCONTEXT,
+    WM_SYSKEYDOWN, LLKHF_EXTENDED, EVENT_SYSTEM_FOREGROUND, WINEVENT_OUTOFCONTEXT, SC_MINIMIZE, SC_RESTORE,
+    WM_SYSCOMMAND, GetClassNameW,
 };
 
 use osk_core::controller::{Clicked, Controller};
@@ -209,8 +210,6 @@ pub struct State {
     version_rect: Rect,
     /// osk.exe's Fn: the next number-row key sends F1..F12.
     fn_on: bool,
-    /// The foreground window at the last click on the keyboard.
-    typing_in: isize,
     /// Keys a real keyboard holds down (KEY_* codes), lit on the osk.
     held: Vec<u16>,
     /// Windows' Caps Lock state, flipped by every Caps Lock press.
@@ -295,9 +294,14 @@ unsafe extern "system" fn key_hook(code: i32, wparam: WPARAM, lparam: LPARAM) ->
         // Scancode 0x21D is the left Ctrl Windows fakes under AltGr.
         if k.dwExtraInfo != OSK_MARK && k.scanCode & 0x200 == 0 {
             let ext = k.flags.0 & LLKHF_EXTENDED.0 != 0;
+            let down = matches!(wparam.0 as u32, WM_KEYDOWN | WM_SYSKEYDOWN);
+            let hwnd = HWND(OSK_HWND.load(Ordering::Relaxed) as *mut _);
+            // After a taskbar click the osk holds focus and would swallow real typing:
+            // return it before the key is delivered (the key itself is never consumed).
+            if down {
+                give_focus_back(hwnd);
+            }
             if let Some(c) = phys_code(k.vkCode, k.scanCode, ext) {
-                let down = matches!(wparam.0 as u32, WM_KEYDOWN | WM_SYSKEYDOWN);
-                let hwnd = HWND(OSK_HWND.load(Ordering::Relaxed) as *mut _);
                 let _ = unsafe { PostMessageW(Some(hwnd), WM_PHYS_KEY, WPARAM(c as usize), LPARAM(down as isize)) };
             }
         }
@@ -315,16 +319,64 @@ fn phys_code(vk: u32, scan: u32, extended: bool) -> Option<u16> {
     (89..=key::KEY_FN).find(|&c| crate::vk::vk_for(c) == Some(vk))
 }
 
+/// The window the user last worked in (never the osk or the taskbar):
+/// where focus goes back after a taskbar click on the osk.
+static TYPING_IN: AtomicIsize = AtomicIsize::new(0);
+
+/// The taskbar may have activated the keyboard (that is how Windows
+/// toggles its minimize). Before a click sends keys, return focus to the
+/// window the user was typing in; never take it from another window, nor
+/// give it to one that is gone, hidden or minimized.
+fn give_focus_back(hwnd: HWND) {
+    if unsafe { GetForegroundWindow() } != hwnd {
+        return;
+    }
+    let t = HWND(TYPING_IN.load(Ordering::Relaxed) as *mut _);
+    if is_typing_target(t, hwnd) {
+        let _ = unsafe { SetForegroundWindow(t) };
+    }
+}
+
+/// The one rule for "a window worth typing into": not the osk, not the
+/// shell (taskbars, desktop), visible and not minimized.
+fn is_typing_target(w: HWND, osk: HWND) -> bool {
+    if w.is_invalid() || w == osk || !unsafe { IsWindowVisible(w) }.as_bool() || unsafe { IsIconic(w) }.as_bool() {
+        return false;
+    }
+    let mut buf = [0u16; 32];
+    let n = usize::try_from(unsafe { GetClassNameW(w, &mut buf) }).unwrap_or(0);
+    // A longer class is truncated, so it cannot equal a shell name.
+    ![
+        windows::core::w!("Shell_TrayWnd"),
+        windows::core::w!("Shell_SecondaryTrayWnd"),
+        windows::core::w!("Progman"),
+        windows::core::w!("WorkerW"),
+    ]
+    .iter()
+    .any(|c| unsafe { c.as_wide() } == &buf[..n])
+}
+
+/// Seed before the osk is shown so the first restore can already type.
+fn seed_typing_target(osk: HWND) {
+    let fg = unsafe { GetForegroundWindow() };
+    if is_typing_target(fg, osk) {
+        TYPING_IN.store(fg.0 as isize, Ordering::Relaxed);
+    }
+}
+
 unsafe extern "system" fn foreground_changed(
     _: HWINEVENTHOOK,
     _: u32,
-    _: HWND,
+    fg: HWND,
     _: i32,
     _: i32,
     _: u32,
     _: u32,
 ) {
     let hwnd = HWND(OSK_HWND.load(Ordering::Relaxed) as *mut _);
+    if is_typing_target(fg, hwnd) {
+        TYPING_IN.store(fg.0 as isize, Ordering::Relaxed);
+    }
     let _ = unsafe { PostMessageW(Some(hwnd), WM_RAISE, WPARAM(0), LPARAM(0)) };
 }
 
@@ -417,7 +469,6 @@ impl State {
             min_rect: Rect::default(),
             version_rect: Rect::default(),
             fn_on: false,
-            typing_in: 0,
             held: Vec::new(),
             caps_on: unsafe { GetKeyState(i32::from(VK_CAPITAL.0)) } & 1 != 0,
             layout_idx,
@@ -497,12 +548,7 @@ impl State {
                 if k.is_gap() {
                     continue;
                 }
-                let (rx, ry, rw, rh) = v.key_rect(r, i);
-                if (x as f64) >= rx
-                    && (x as f64) < rx + rw
-                    && (y as f64) >= ry
-                    && (y as f64) < ry + rh
-                {
+                if v.key_hit(r, i, x as f64, y as f64) {
                     return Some(r * 100 + i);
                 }
             }
@@ -865,10 +911,6 @@ impl State {
             self.interact(IEvent::Release);
             return;
         }
-        let fg = unsafe { GetForegroundWindow() }.0 as isize;
-        if fg != self.hwnd {
-            self.typing_in = fg;
-        }
         let (x, y) = (self.px as f64, self.py as f64);
         if self.theme_menu_open {
             if let Some(i) = (0..THEMES.len()).find(|&i| self.theme_item_rects[i].contains(x, y)) {
@@ -895,7 +937,10 @@ impl State {
             return;
         }
         if self.min_rect.contains(x, y) {
-            let _ = unsafe { ShowWindow(HWND(self.hwnd as *mut _), SW_SHOWMINNOACTIVE) };
+            // Posted, not sent: ShowWindow would re-enter wnd_proc while self is borrowed.
+            let _ = unsafe {
+                PostMessageW(Some(HWND(self.hwnd as *mut _)), WM_SYSCOMMAND, WPARAM(SC_MINIMIZE as usize), LPARAM(0))
+            };
             return;
         }
         if self.theme_rect.contains(x, y) {
@@ -918,12 +963,10 @@ impl State {
             });
             return;
         }
-        if self.py < self.view().bar_h() as i32 {
+        // Anything that is not a button (bar, gaps between keys, margins) drags.
+        let Some(k) = self.key_at(self.px, self.py) else {
             self.drag_origin = (self.pos_x, self.pos_y);
             self.interact(IEvent::StartMove { x: sx, y: sy });
-            return;
-        }
-        let Some(k) = self.key_at(self.px, self.py) else {
             return;
         };
         let mut key = windows_click(*self.key_of(k));
@@ -1102,6 +1145,10 @@ fn lparam_xy(lparam: LPARAM) -> (i32, i32) {
 }
 
 unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    // Before `state` exists: SetForegroundWindow re-enters wnd_proc (WM_ACTIVATE...).
+    if msg == WM_LBUTTONDOWN {
+        give_focus_back(hwnd);
+    }
     let ptr = unsafe { STATE_PTR };
     if ptr.is_null() {
         return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
@@ -1109,12 +1156,6 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
     let state = unsafe { &mut *ptr };
     let result = match msg {
         WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE),
-        // A taskbar click (restore) activates the keyboard: hand focus back
-        // to the window the user was typing in, so keys land there.
-        WM_ACTIVATE if u32::from(wparam.0 as u16) != WA_INACTIVE && state.typing_in != 0 => {
-            let _ = unsafe { SetForegroundWindow(HWND(state.typing_in as *mut _)) };
-            LRESULT(0)
-        }
         WM_ERASEBKGND => LRESULT(1),
         WM_PAINT => {
             let mut ps = PAINTSTRUCT::default();
@@ -1223,7 +1264,8 @@ pub fn run(backend: Box<dyn Backend>) -> i32 {
     let _single = unsafe { CreateMutexW(None, false, PCWSTR::from_raw(mutex_name.as_ptr())) };
     if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
         if let Ok(h) = unsafe { FindWindowW(PCWSTR::from_raw(class_name.as_ptr()), PCWSTR::null()) } {
-            let _ = unsafe { ShowWindow(h, SW_SHOWNOACTIVATE) };
+            // A minimized keyboard restores like a taskbar click; a visible one is untouched.
+            let _ = unsafe { PostMessageW(Some(h), WM_SYSCOMMAND, WPARAM(SC_RESTORE as usize), LPARAM(0)) };
         }
         state.backend.destroy();
         return 0;
@@ -1276,6 +1318,7 @@ pub fn run(backend: Box<dyn Backend>) -> i32 {
     state.hwnd = hwnd.0 as isize;
     OSK_HWND.store(state.hwnd, Ordering::Relaxed);
     state.last_geom = (state.pos_x, state.pos_y, state.width, state.height);
+    seed_typing_target(hwnd);
     unsafe {
         let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
     }
@@ -1353,6 +1396,23 @@ mod tests {
 
     fn state_counting(presses: std::rc::Rc<std::cell::Cell<usize>>) -> State {
         state_with(presses, Default::default())
+    }
+
+    #[test]
+    fn background_between_keys_does_not_type() {
+        let presses = std::rc::Rc::new(std::cell::Cell::new(0));
+        let mut s = state_counting(presses.clone());
+        let (x, y, w, h) = s.view().key_rect(1, 1);
+        for (px, py) in [(x, y + h / 2.0), (x + w / 2.0, y), (x, y)] {
+            s.px = px.round() as i32;
+            s.py = py.round() as i32;
+            s.inside = true;
+            assert_eq!(s.key_at(s.px, s.py), None, "background at {px},{py}");
+            s.on_button(true);
+            s.on_button(false);
+        }
+        assert_eq!(presses.get(), 0);
+        assert!(s.key_at((x + w / 2.0) as i32, (y + h / 2.0) as i32).is_some());
     }
 
     fn state_logging(events: Events) -> State {

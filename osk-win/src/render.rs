@@ -1088,6 +1088,24 @@ impl View<'_> {
         )
     }
 
+    /// Whether (x, y) lands on the painted face of key (r, i): the same
+    /// inset rounded rect `paint_key` fills, so gaps and corners are not keys.
+    pub(crate) fn key_hit(&self, r: usize, i: usize, x: f64, y: f64) -> bool {
+        let m = self.metrics();
+        let key = &self.layout().rows[r].keys[i];
+        let (rx, ry, rw, rh) = self.key_rect(r, i);
+        let inset = m.g / 2.0;
+        // The unlabeled Enter cell reaches up into Enter, as in `paint_key`.
+        let tail = if key.code_u16() == key::KEY_ENTER && key.label == Some("") { inset + m.key_r } else { 0.0 };
+        if y < ry - tail {
+            return false;
+        }
+        let (hw, hh) = ((rw - 2.0 * inset) / 2.0, (rh - 2.0 * inset) / 2.0 + tail);
+        let dx = ((x - (rx + rw / 2.0)).abs() - (hw - m.key_r)).max(0.0);
+        let dy = ((y - (ry + rh / 2.0 - tail)).abs() - (hh - m.key_r)).max(0.0);
+        dx * dx + dy * dy <= m.key_r * m.key_r
+    }
+
     /// Side of the bottom-right resize handle, in logical pixels.
     pub(crate) fn handle_size(&self) -> i32 {
         // Spacing must not stretch: half a scale unit, floor 24 px.
