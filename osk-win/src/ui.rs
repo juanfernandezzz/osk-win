@@ -37,7 +37,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_SETCURSOR, WM_SIZE, WM_TIMER, WNDCLASSEXW, WS_EX_APPWINDOW, WS_EX_NOACTIVATE,
     WS_EX_TOPMOST, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, FindWindowW, SetForegroundWindow, GetForegroundWindow, IsIconic, IsWindowVisible,
     GetWindow, GW_HWNDPREV, HWND_TOPMOST, SWP_NOMOVE, KBDLLHOOKSTRUCT, WH_KEYBOARD_LL, WM_KEYDOWN,
-    WM_SYSKEYDOWN, LLKHF_EXTENDED, EVENT_SYSTEM_FOREGROUND, WINEVENT_OUTOFCONTEXT, SC_MINIMIZE, SC_RESTORE,
+    WM_SYSKEYDOWN, LLKHF_EXTENDED, EVENT_SYSTEM_FOREGROUND, WINEVENT_OUTOFCONTEXT, SW_SHOWMINNOACTIVE, SC_RESTORE,
     WM_SYSCOMMAND, GetClassNameW,
 };
 
@@ -287,6 +287,8 @@ static OSK_HWND: AtomicIsize = AtomicIsize::new(0);
 const WM_PHYS_KEY: u32 = WM_APP + 2;
 /// Posted by [`foreground_changed`]: take back the place above the taskbar.
 const WM_RAISE: u32 = WM_APP + 3;
+/// Posted by the minimize button: minimize without activating (keeps the target's focus).
+const WM_MINIMIZE_SELF: u32 = WM_APP + 4;
 
 unsafe extern "system" fn key_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code == HC_ACTION {
@@ -938,9 +940,7 @@ impl State {
         }
         if self.min_rect.contains(x, y) {
             // Posted, not sent: ShowWindow would re-enter wnd_proc while self is borrowed.
-            let _ = unsafe {
-                PostMessageW(Some(HWND(self.hwnd as *mut _)), WM_SYSCOMMAND, WPARAM(SC_MINIMIZE as usize), LPARAM(0))
-            };
+            let _ = unsafe { PostMessageW(Some(HWND(self.hwnd as *mut _)), WM_MINIMIZE_SELF, WPARAM(0), LPARAM(0)) };
             return;
         }
         if self.theme_rect.contains(x, y) {
@@ -1148,6 +1148,13 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
     // Before `state` exists: SetForegroundWindow re-enters wnd_proc (WM_ACTIVATE...).
     if msg == WM_LBUTTONDOWN {
         give_focus_back(hwnd);
+    }
+    // Before `state` exists too: minimizing re-enters wnd_proc (WM_SIZE...). Capture is dropped
+    // here because the button-up will no longer reach a minimized window.
+    if msg == WM_MINIMIZE_SELF {
+        let _ = unsafe { ReleaseCapture() };
+        let _ = unsafe { ShowWindow(hwnd, SW_SHOWMINNOACTIVE) };
+        return LRESULT(0);
     }
     let ptr = unsafe { STATE_PTR };
     if ptr.is_null() {
